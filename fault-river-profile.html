@@ -10,5 +10,652 @@ title:  Fault to River Profile
 <h1>Fault to River Profile</h1>
 
 <p>
-Coming soon.
+<b>Drag the red nodes</b> on the fault panel to reshape the fault geometry.
+The uplift rate at any surface position is \( v = -V_{\text{slip}} \sin\theta \)
+where \( \theta \) is the dip of the fault segment directly below.
+The topography evolves via the stream-power equation
+\( \partial z / \partial t = U(x) - K\, A^m\, |\partial z / \partial x|^n \)
+with drainage area from Hack's law \( A = (L - x)^h \).
 </p>
+
+<style>
+  .pnl-lbl {
+    font: 10px/1 'Courier New', Courier, monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #33cc33;
+    margin: 10px 0 3px 0;
+    text-shadow: 0 0 6px rgba(51,255,51,0.3);
+  }
+  .pnl-lbl:first-child { margin-top: 0; }
+  #sim-container canvas {
+    width: 100%; display: block;
+    border: 1px solid #1a3a1a;
+  }
+  #sim-info {
+    font: 11px/1.4 'Courier New', Courier, monospace;
+    color: #33cc33;
+    letter-spacing: 0.03em;
+    text-shadow: 0 0 6px rgba(51,255,51,0.25);
+  }
+  #sim-controls button {
+    background: #0a0a0a; color: #33ff33;
+    border: 1px solid #1a3a1a;
+    padding: 5px 14px;
+    font: 12px/1 'Courier New', Courier, monospace;
+    cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    text-shadow: 0 0 4px rgba(51,255,51,0.3);
+  }
+  #sim-controls button:hover:not(:disabled) { background: #0d1f0d; border-color: #33ff33; }
+  #sim-controls button:disabled { opacity: 0.3; cursor: default; }
+  #sim-controls label {
+    font: 13px/1 'Courier New', Courier, monospace; color: #33cc33;
+    text-shadow: 0 0 4px rgba(51,255,51,0.2);
+  }
+  #sim-controls span {
+    font: 12px/1 'Courier New', Courier, monospace; color: #66ff66;
+  }
+  #sim-controls input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    height: 3px; background: #1a3a1a; border-radius: 0; outline: none;
+  }
+  #sim-controls input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 0;
+    background: #33ff33; cursor: pointer;
+    border: 1px solid #000;
+  }
+</style>
+
+<div id="sim-container" style="margin: 1.5rem 0;">
+  <div class="pnl-lbl">topography</div>
+  <canvas id="canvas-topo"></canvas>
+
+  <div class="pnl-lbl">uplift rate</div>
+  <canvas id="canvas-uplift"></canvas>
+
+  <div class="pnl-lbl">fault geometry &mdash; drag nodes</div>
+  <canvas id="canvas-fault" style="cursor: default;"></canvas>
+</div>
+
+<div id="sim-info" style="margin-bottom: 0.4rem;">
+  step <span id="info-step">0</span> &ensp;&middot;&ensp;
+  <span id="info-time">0.00</span> Myr &ensp;&middot;&ensp;
+  max z <span id="info-maxz">0.00</span> km
+</div>
+
+<div id="sim-controls" style="margin-bottom: 1.5rem;">
+  <div style="margin-bottom: 0.5rem;">
+    <button id="btn-play">Play</button>
+    <button id="btn-pause" disabled>Pause</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+  <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; max-width: 420px;">
+    <label for="sl-nodes">nodes</label>
+    <input id="sl-nodes" type="range" min="2" max="8" step="1" value="5">
+    <span id="val-nodes">5</span>
+
+    <label for="sl-m">\(m\)</label>
+    <input id="sl-m" type="range" min="0.1" max="2.0" step="0.1" value="0.5">
+    <span id="val-m">0.5</span>
+
+    <label for="sl-n">\(n\)</label>
+    <input id="sl-n" type="range" min="0.5" max="3.0" step="0.1" value="1.0">
+    <span id="val-n">1.0</span>
+
+    <label for="sl-h">hack \(h\)</label>
+    <input id="sl-h" type="range" min="1.0" max="2.5" step="0.1" value="1.67">
+    <span id="val-h">1.67</span>
+
+    <label for="sl-delay">delay</label>
+    <input id="sl-delay" type="range" min="0" max="200" step="5" value="30">
+    <span id="val-delay">30 ms</span>
+  </div>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+/* ================================================================
+   Section 0: Constants & State
+   ================================================================ */
+const X_END = 200;
+const NX = 401;
+const DX = X_END / (NX - 1);
+const K = 0.3;
+const SLIP_RATE = 1.0;
+const DT = 0.02;
+
+const xGrid = new Float64Array(NX);
+for (let i = 0; i < NX; i++) xGrid[i] = i * DX;
+
+let DA = new Float64Array(NX);
+let xctrl, zctrl, nNodes;
+let faultZ = new Float64Array(NX);
+let upliftRate = new Float64Array(NX);
+let topoZ = new Float64Array(NX);
+let playing = false;
+let animFrameId = null;
+let lastFrameTime = 0;
+let simStep = 0;
+let simTime = 0;
+
+function recomputeDA() {
+  const h = getParam("h");
+  for (let i = 0; i < NX; i++) {
+    const Lx = X_END - xGrid[i];
+    DA[i] = Lx > 0 ? Math.pow(Lx, h) : 0;
+  }
+}
+
+/* ================================================================
+   Section 1: DOM Refs & Slider Registry
+   ================================================================ */
+const canvasTopo   = document.getElementById("canvas-topo");
+const canvasUplift = document.getElementById("canvas-uplift");
+const canvasFault  = document.getElementById("canvas-fault");
+const ctxTopo   = canvasTopo.getContext("2d");
+const ctxUplift = canvasUplift.getContext("2d");
+const ctxFault  = canvasFault.getContext("2d");
+
+canvasTopo.width = 800;   canvasTopo.height = 200;
+canvasUplift.width = 800; canvasUplift.height = 160;
+canvasFault.width = 800;  canvasFault.height = 200;
+
+const btnPlay  = document.getElementById("btn-play");
+const btnPause = document.getElementById("btn-pause");
+const btnReset = document.getElementById("btn-reset");
+const infoStep = document.getElementById("info-step");
+const infoTime = document.getElementById("info-time");
+const infoMaxZ = document.getElementById("info-maxz");
+
+const sliders = {
+  nodes: { el: document.getElementById("sl-nodes"), valEl: document.getElementById("val-nodes"), fmt: function(v){return v;} },
+  m:     { el: document.getElementById("sl-m"),     valEl: document.getElementById("val-m"),     fmt: function(v){return v;} },
+  n:     { el: document.getElementById("sl-n"),     valEl: document.getElementById("val-n"),     fmt: function(v){return v;} },
+  h:     { el: document.getElementById("sl-h"),     valEl: document.getElementById("val-h"),     fmt: function(v){return v;} },
+  delay: { el: document.getElementById("sl-delay"), valEl: document.getElementById("val-delay"), fmt: function(v){return v + " ms";} },
+};
+
+function getParam(name) { return parseFloat(sliders[name].el.value); }
+
+for (var key in sliders) {
+  if (!sliders.hasOwnProperty(key)) continue;
+  (function(s) {
+    s.el.addEventListener("input", function () { s.valEl.textContent = s.fmt(s.el.value); });
+  })(sliders[key]);
+}
+
+/* ================================================================
+   Section 2: Plot Drawing Utilities
+   ================================================================ */
+var PAD = { left: 8, right: 8, top: 8, bottom: 8 };
+
+function makePlotTransform(cw, ch, xMin, xMax, yMin, yMax) {
+  var pw = cw - PAD.left - PAD.right;
+  var ph = ch - PAD.top - PAD.bottom;
+  return {
+    xMin: xMin, xMax: xMax, yMin: yMin, yMax: yMax, pw: pw, ph: ph,
+    toCanvasX: function (x) { return PAD.left + (x - xMin) / (xMax - xMin) * pw; },
+    toCanvasY: function (y) { return PAD.top + (1 - (y - yMin) / (yMax - yMin)) * ph; },
+    fromCanvasX: function (cx) { return xMin + (cx - PAD.left) / pw * (xMax - xMin); },
+    fromCanvasY: function (cy) { return yMin + (1 - (cy - PAD.top) / ph) * (yMax - yMin); }
+  };
+}
+
+function drawPlot(ctx, cw, ch, opts) {
+  var t = opts.transform;
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, cw, ch);
+
+  // filled area
+  if (opts.fill) {
+    var d = opts.fill;
+    ctx.fillStyle = d.color;
+    ctx.beginPath();
+    var baseY = (d.base === "bottom") ? ch : t.toCanvasY(d.base !== undefined ? d.base : 0);
+    ctx.moveTo(t.toCanvasX(d.x[0]), baseY);
+    for (var i = 0; i < d.x.length; i++) {
+      ctx.lineTo(t.toCanvasX(d.x[i]), t.toCanvasY(d.y[i]));
+    }
+    ctx.lineTo(t.toCanvasX(d.x[d.x.length - 1]), baseY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // lines
+  if (opts.lines) {
+    for (var li = 0; li < opts.lines.length; li++) {
+      var line = opts.lines[li];
+      ctx.strokeStyle = line.color;
+      ctx.lineWidth = line.width || 2;
+      ctx.beginPath();
+      for (var i2 = 0; i2 < line.x.length; i2++) {
+        var px = t.toCanvasX(line.x[i2]);
+        var py = t.toCanvasY(line.y[i2]);
+        if (i2 === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+  }
+
+  // draggable nodes
+  if (opts.nodes) {
+    var nd = opts.nodes;
+    for (var ni = 0; ni < nd.x.length; ni++) {
+      var ncx = t.toCanvasX(nd.x[ni]);
+      var ncy = t.toCanvasY(nd.y[ni]);
+      ctx.beginPath();
+      ctx.arc(ncx, ncy, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ef4444";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  // CRT scanlines
+  ctx.fillStyle = "rgba(0,0,0,0.07)";
+  for (var sl = 0; sl < ch; sl += 3) {
+    ctx.fillRect(0, sl, cw, 1);
+  }
+}
+
+/* ================================================================
+   Section 3: Fault Interpolation (piecewise linear)
+   ================================================================ */
+function interpFault(xq, xc, zc) {
+  var out = new Float64Array(xq.length);
+  var seg = 0;
+  for (var i = 0; i < xq.length; i++) {
+    var x = xq[i];
+    while (seg < xc.length - 2 && x > xc[seg + 1]) seg++;
+    var frac = (x - xc[seg]) / (xc[seg + 1] - xc[seg]);
+    out[i] = zc[seg] + frac * (zc[seg + 1] - zc[seg]);
+  }
+  return out;
+}
+
+/* ================================================================
+   Section 4: Uplift Computation (direct from segment angles)
+   ================================================================ */
+function computeUplift(xq, xc, zc, slipRate) {
+  var nSeg = xc.length - 1;
+  var theta = new Float64Array(nSeg);
+  for (var k = 0; k < nSeg; k++) {
+    theta[k] = Math.atan2(zc[k + 1] - zc[k], xc[k + 1] - xc[k]);
+  }
+  var out = new Float64Array(xq.length);
+  var seg = 0;
+  for (var i = 0; i < xq.length; i++) {
+    while (seg < nSeg - 1 && xq[i] > xc[seg + 1]) seg++;
+    out[i] = Math.max(0.0, -slipRate * Math.sin(theta[seg]));
+  }
+  return out;
+}
+
+/* ================================================================
+   Section 5: TVD Stream-Power Solver
+   ================================================================ */
+function fillDepressions(z) {
+  var nx = z.length;
+  var max_val = z[0];
+  for (var i = 1; i < nx; i++) {
+    if (z[i] < max_val) { z[i] = max_val; } else { max_val = z[i]; }
+  }
+}
+
+function tvdStep(z_rev, dx, dtMacro, Ke, m, n, DA_rev, cfl) {
+  var nx = z_rev.length;
+  var z = new Float64Array(z_rev);
+
+  var a_ori = new Float64Array(nx);
+  for (var i = 0; i < nx; i++) {
+    a_ori[i] = -Ke * Math.pow(Math.max(DA_rev[i], 1e-12), m);
+  }
+
+  var a = new Float64Array(nx);
+  var t_left = dtMacro;
+  var r = new Float64Array(nx);
+  var phi = new Float64Array(nx);
+  var Fr = new Float64Array(nx);
+  var Fl = new Float64Array(nx);
+  var z_new = new Float64Array(nx);
+  var iters = 0;
+
+  while (t_left > 1e-8 && iters < 5000) {
+    iters++;
+    var dte = t_left;
+
+    for (var i = 0; i < nx; i++) { if (z[i] < 1e-10) z[i] = 0.0; }
+
+    var a_abs_max = 0.0;
+    if (n !== 1.0) {
+      for (var i = 0; i < nx; i++) {
+        var zr_val = (i < nx - 1) ? z[i + 1] : z[nx - 1];
+        var s1 = (z[i] - zr_val) / dx;
+        if (s1 < 1e-12) s1 = 0.0;
+        var exp_f = 1.0;
+        if (s1 > 0.0) { exp_f = Math.pow(s1, n - 1.0); }
+        a[i] = a_ori[i] * exp_f;
+        var abs_a = Math.abs(a[i]);
+        if (abs_a > a_abs_max) a_abs_max = abs_a;
+      }
+    } else {
+      for (var i = 0; i < nx; i++) {
+        a[i] = a_ori[i];
+        var abs_a = Math.abs(a[i]);
+        if (abs_a > a_abs_max) a_abs_max = abs_a;
+      }
+    }
+
+    if (a_abs_max > 0.0) {
+      var dt_calc = cfl * dx / a_abs_max;
+      if (dt_calc < dte) dte = dt_calc;
+    }
+
+    for (var i = 0; i < nx; i++) {
+      var z_val = z[i];
+      var zr_val = (i < nx - 1) ? z[i + 1] : z[nx - 1];
+      var zr2_val = (i < nx - 2) ? z[i + 2] : z[nx - 1];
+      var denom = zr_val - z_val;
+      if (Math.abs(denom) > 1e-12) { r[i] = (zr2_val - zr_val) / denom; } else { r[i] = 1.0; }
+    }
+    r[0] = 1.0; r[nx - 1] = 1.0;
+
+    for (var i = 0; i < nx; i++) {
+      phi[i] = (r[i] + Math.abs(r[i])) / (1.0 + Math.abs(r[i]));
+    }
+
+    for (var i = 0; i < nx; i++) {
+      var a_val = a[i];
+      var a_p = Math.max(0.0, a_val);
+      var a_m = Math.min(0.0, a_val);
+      var z_val = z[i];
+      var zr_val = (i < nx - 1) ? z[i + 1] : z[nx - 1];
+      var zl_val = (i > 0) ? z[i - 1] : z[0];
+      var phi_val = phi[i];
+      var phiL_val = (i > 0) ? phi[i - 1] : phi[0];
+
+      var Frl = a_p * z_val + a_m * zr_val;
+      var Frh = 0.5 * a_val * (z_val + zr_val) - 0.5 * (a_val * a_val) * (dte / dx) * (zr_val - z_val);
+      var Fll = a_p * zl_val + a_m * z_val;
+      var Flh = 0.5 * a_val * (zl_val + z_val) - 0.5 * (a_val * a_val) * (dte / dx) * (z_val - zl_val);
+
+      Fr[i] = Frl + phi_val * (Frh - Frl);
+      Fl[i] = Fll + phiL_val * (Flh - Fll);
+    }
+
+    for (var i = 0; i < nx; i++) {
+      z_new[i] = z[i] - (dte / dx) * (Fr[i] - Fl[i]);
+    }
+    z_new[0] = z_new[1];
+    z_new[nx - 1] = z[nx - 1];
+
+    for (var i = 0; i < nx; i++) z[i] = z_new[i];
+    t_left -= dte;
+  }
+
+  return z;
+}
+
+/* ================================================================
+   Section 6: Mouse Drag Interaction
+   ================================================================ */
+var dragIdx = -1;
+var faultTr = null;
+
+function getCanvasCoords(canvas, e) {
+  var rect = canvas.getBoundingClientRect();
+  var sx = canvas.width / rect.width;
+  var sy = canvas.height / rect.height;
+  var cx = e.touches ? e.touches[0].clientX : e.clientX;
+  var cy = e.touches ? e.touches[0].clientY : e.clientY;
+  return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy };
+}
+
+function hitTest(cx, cy) {
+  if (!faultTr) return -1;
+  for (var i = 0; i < nNodes; i++) {
+    var dx2 = cx - faultTr.toCanvasX(xctrl[i]);
+    var dy2 = cy - faultTr.toCanvasY(zctrl[i]);
+    if (dx2 * dx2 + dy2 * dy2 <= 144) return i;
+  }
+  return -1;
+}
+
+function onDown(e) {
+  e.preventDefault();
+  var c = getCanvasCoords(canvasFault, e);
+  var idx = hitTest(c.x, c.y);
+  if (idx >= 0) { dragIdx = idx; canvasFault.style.cursor = "grabbing"; }
+}
+
+function onMove(e) {
+  e.preventDefault();
+  if (dragIdx < 0) {
+    var c = getCanvasCoords(canvasFault, e);
+    canvasFault.style.cursor = hitTest(c.x, c.y) >= 0 ? "grab" : "default";
+    return;
+  }
+
+  var c2 = getCanvasCoords(canvasFault, e);
+  var dataX = faultTr.fromCanvasX(c2.x);
+  var dataZ = faultTr.fromCanvasY(c2.y);
+
+  // Endpoints: x stays fixed at domain boundaries, z is free
+  if (dragIdx === 0) {
+    dataX = 0;
+  } else if (dragIdx === nNodes - 1) {
+    dataX = X_END;
+  } else {
+    // Interior nodes: enforce strictly increasing x
+    var margin = 1;
+    if (dataX <= xctrl[dragIdx - 1] + margin) dataX = xctrl[dragIdx - 1] + margin;
+    if (dataX >= xctrl[dragIdx + 1] - margin) dataX = xctrl[dragIdx + 1] - margin;
+  }
+
+  xctrl[dragIdx] = dataX;
+  zctrl[dragIdx] = dataZ;
+
+  rebuildFromFault();
+}
+
+function onUp() {
+  if (dragIdx >= 0) { dragIdx = -1; canvasFault.style.cursor = "default"; }
+}
+
+canvasFault.addEventListener("mousedown", onDown);
+canvasFault.addEventListener("mousemove", onMove);
+document.addEventListener("mouseup", onUp);
+canvasFault.addEventListener("touchstart", function (e) { onDown(e); }, { passive: false });
+canvasFault.addEventListener("touchmove", function (e) { onMove(e); }, { passive: false });
+document.addEventListener("touchend", onUp);
+
+/* ================================================================
+   Section 7: Rendering
+   ================================================================ */
+function renderFault() {
+  var cw = canvasFault.width, ch = canvasFault.height;
+  var zMin = 0, zMax = 0;
+  for (var i = 0; i < NX; i++) {
+    if (faultZ[i] < zMin) zMin = faultZ[i];
+    if (faultZ[i] > zMax) zMax = faultZ[i];
+  }
+  for (var j = 0; j < nNodes; j++) {
+    if (zctrl[j] < zMin) zMin = zctrl[j];
+    if (zctrl[j] > zMax) zMax = zctrl[j];
+  }
+  var span = zMax - zMin;
+  var mg = Math.max(3, span * 0.15);
+  zMin -= mg; zMax += mg;
+  if (zMax - zMin < 5) { var mid = (zMax + zMin) / 2; zMin = mid - 2.5; zMax = mid + 2.5; }
+
+  faultTr = makePlotTransform(cw, ch, 0, X_END, zMin, zMax);
+  drawPlot(ctxFault, cw, ch, {
+    transform: faultTr,
+    fill: { x: xGrid, y: faultZ, color: "#1a0a0f", base: "bottom" },
+    lines: [{ x: xGrid, y: faultZ, color: "#ef4444", width: 2 }],
+    nodes: { x: xctrl, y: zctrl }
+  });
+}
+
+function renderUplift() {
+  var cw = canvasUplift.width, ch = canvasUplift.height;
+  var uMin = 0, uMax = 0;
+  for (var i = 0; i < NX; i++) {
+    if (upliftRate[i] < uMin) uMin = upliftRate[i];
+    if (upliftRate[i] > uMax) uMax = upliftRate[i];
+  }
+  var span = uMax - uMin;
+  var mg = Math.max(0.01, span * 0.15);
+  uMin -= mg; uMax += mg;
+  if (uMax - uMin < 0.02) { var mid2 = (uMax + uMin) / 2; uMin = mid2 - 0.01; uMax = mid2 + 0.01; }
+
+  var t = makePlotTransform(cw, ch, 0, X_END, uMin, uMax);
+  drawPlot(ctxUplift, cw, ch, {
+    transform: t,
+    fill: { x: xGrid, y: upliftRate, color: "rgba(251,191,36,0.15)" },
+    lines: [{ x: xGrid, y: upliftRate, color: "#fbbf24", width: 2 }]
+  });
+}
+
+function renderTopo() {
+  var cw = canvasTopo.width, ch = canvasTopo.height;
+  var zMin2 = 0, zMax2 = 0;
+  for (var i = 0; i < NX; i++) {
+    if (topoZ[i] < zMin2) zMin2 = topoZ[i];
+    if (topoZ[i] > zMax2) zMax2 = topoZ[i];
+  }
+  zMax2 = Math.max(zMax2, 0.5) * 1.2;
+  if (zMin2 < 0) zMin2 *= 1.2; else zMin2 = -0.1;
+
+  var t = makePlotTransform(cw, ch, 0, X_END, zMin2, zMax2);
+  drawPlot(ctxTopo, cw, ch, {
+    transform: t,
+    fill: { x: xGrid, y: topoZ, color: "#0a2a0f", base: "bottom" },
+    lines: [{ x: xGrid, y: topoZ, color: "#33ff33", width: 2 }]
+  });
+}
+
+function updateInfo() {
+  infoStep.textContent = simStep;
+  infoTime.textContent = simTime.toFixed(2);
+  var maxZ = 0;
+  for (var i = 0; i < NX; i++) if (topoZ[i] > maxZ) maxZ = topoZ[i];
+  infoMaxZ.textContent = maxZ.toFixed(2);
+}
+
+function renderAll() {
+  renderFault();
+  renderUplift();
+  renderTopo();
+  updateInfo();
+}
+
+/* ================================================================
+   Section 8: Animation Loop
+   ================================================================ */
+function doStep() {
+  var m = getParam("m");
+  var n = getParam("n");
+
+  // Operator splitting: apply uplift first (skip outlet at i=0)
+  for (var i = 1; i < NX; i++) { topoZ[i] += upliftRate[i] * DT; }
+
+  // Reverse arrays for upstream wave propagation
+  var z_rev = new Float64Array(NX);
+  var da_rev = new Float64Array(NX);
+  for (var i = 0; i < NX; i++) {
+    z_rev[i] = topoZ[NX - 1 - i];
+    da_rev[i] = Math.max(DA[NX - 1 - i], 1e-12);
+  }
+
+  // TVD erosion step on reversed arrays
+  z_rev = tvdStep(z_rev, DX, DT, K, m, n, da_rev, 0.9);
+
+  // Reverse back
+  for (var i = 0; i < NX; i++) { topoZ[i] = z_rev[NX - 1 - i]; }
+
+  // Fill depressions (enforce non-decreasing from outlet)
+  fillDepressions(topoZ);
+
+  simStep++;
+  simTime += DT;
+  renderTopo();
+  updateInfo();
+}
+
+function animate(ts) {
+  if (!playing) return;
+  if (ts - lastFrameTime >= getParam("delay")) {
+    lastFrameTime = ts;
+    doStep();
+  }
+  animFrameId = requestAnimationFrame(animate);
+}
+
+function play() {
+  playing = true;
+  btnPlay.disabled = true;
+  btnPause.disabled = false;
+  lastFrameTime = performance.now();
+  animFrameId = requestAnimationFrame(animate);
+}
+
+function pause() {
+  playing = false;
+  btnPlay.disabled = false;
+  btnPause.disabled = true;
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+}
+
+function reset() {
+  pause();
+  simStep = 0;
+  simTime = 0;
+  topoZ = new Float64Array(NX);
+  renderAll();
+}
+
+/* ================================================================
+   Section 9: Init & Wiring
+   ================================================================ */
+function initNodes(nn) {
+  nNodes = nn;
+  xctrl = new Float64Array(nn);
+  zctrl = new Float64Array(nn);
+  for (var i = 0; i < nn; i++) {
+    xctrl[i] = (i / (nn - 1)) * X_END;
+    zctrl[i] = -(i / (nn - 1)) * 30;
+  }
+}
+
+function rebuildFromFault() {
+  faultZ = interpFault(xGrid, xctrl, zctrl);
+  upliftRate = computeUplift(xGrid, xctrl, zctrl, SLIP_RATE);
+  renderAll();
+}
+
+btnPlay.addEventListener("click", play);
+btnPause.addEventListener("click", pause);
+btnReset.addEventListener("click", reset);
+
+sliders.nodes.el.addEventListener("change", function () {
+  initNodes(parseInt(sliders.nodes.el.value));
+  rebuildFromFault();
+});
+
+// h slider: recompute DA live as the slider moves
+sliders.h.el.addEventListener("input", recomputeDA);
+
+// Boot
+recomputeDA();
+initNodes(5);
+rebuildFromFault();
+
+})();
+</script>
