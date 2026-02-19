@@ -10,7 +10,7 @@ title:  Human-River Geomorphic Coupling
 <h1>Human-River Geomorphic Coupling</h1>
 
 <p>
-Meandering rivers act as spatial attractors for human settlement because they provide food and transportation, minimizing the thermodynamic work required for resource extraction and navigation. But rivers also destroy settlements by avulsion &mdash; functioning as unpredictable attractors that can create and annihilate, analogous to a black hole. Settlements are further shaped by internal economies of scale (the bid-rent model: clustering to share public goods and reduce transaction costs) and by spatial inertia (a settlement will not abandon existing infrastructure the moment a marginally better location appears &mdash; relocation only occurs when the stress gradient exceeds a critical friction threshold). <b>Human-River</b> couples all three forces with a migrating meandering river on a cellular automaton.
+Rivers draw people in because they provide food, water, and transport, but they also erode what is built beside them. The model <b>Human&ndash;River</b> turns this dynamic into a cellular automaton simulation: settlements prefer to cluster near a meandering river for economic benefits, tend to group together to share infrastructure, and resist moving unless the pressure to relocate becomes strong enough. As the river shifts across the landscape, it occasionally erases parts of a settlement, forcing people to rebuild elsewhere.
 </p>
 
 <p>
@@ -26,7 +26,7 @@ U(\mathbf{x}, t) \;=\; -\,w_d \, \mathcal{D}(\mathbf{x}, t) \;+\; w_c \, \mathca
 \]
 
 <p>
-where \(\mathcal{D}(\mathbf{x},t) = \min_{\mathbf{y}:\,R(\mathbf{y},t)=1} \|\mathbf{x}-\mathbf{y}\|_2\) is the Euclidean distance to the nearest river cell and \(w_d\) (river attraction) controls how strongly settlements are pulled toward the channel. \(\mathcal{C}(\mathbf{x},t) = \sum_{\mathbf{y}\in\mathcal{N}_8(\mathbf{x})} V(\mathbf{y},t)\) counts the occupied Moore neighbors and \(w_c\) (cohesion) controls the clustering incentive. A voluntary move from the worst cell \(\mathbf{x}_\text{min}\) to the best empty cell \(\mathbf{x}_\text{max}\) occurs only if \(U(\mathbf{x}_\text{max}) - U(\mathbf{x}_\text{min}) > \mu\), where \(\mu\) is the friction threshold. Press <b>Play</b> and tune the sliders.
+where \(\mathcal{D}(\mathbf{x},t) = \min_{\mathbf{y}:\,R(\mathbf{y},t)=1} \|\mathbf{x}-\mathbf{y}\|_2\) is the Euclidean distance to the nearest river cell and \(w_d\) (river attraction) controls how strongly settlements are pulled toward the channel. \(\mathcal{C}(\mathbf{x},t) = \sum_{\mathbf{y}\in\mathcal{N}_8(\mathbf{x})} V(\mathbf{y},t)\) counts the occupied Moore neighbors and \(w_c\) (cohesion) controls the clustering incentive. When the river erodes a settlement cell (forced migration), that cell is automatically relocated to the highest-utility empty site. Voluntary migration is governed by the friction threshold \(\mu\): the worst cell \(\mathbf{x}_\text{min}\) swaps with the best empty cell \(\mathbf{x}_\text{max}\) only if \(U(\mathbf{x}_\text{max}) - U(\mathbf{x}_\text{min}) > \mu\). Higher \(\mu\) means settlements are more inert and resist voluntary relocation. Press <b>Play</b> and tune the sliders.
 </p>
 
 <!-- ═══ Simulator ═══ -->
