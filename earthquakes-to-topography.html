@@ -385,11 +385,14 @@ function renderFault(eqFlash) {
   var colorActive = "#e74c3c", colorInactive = "#95a5a6";
   var widthActive = 3.5, widthInactive = 1.5;
 
-  var colorShallow = eqFlash ? colorActive : colorInactive;
-  var widthShallow = eqFlash ? widthActive : widthInactive;
+  var eqInterval = getInterval();
+  var allActive = (eqInterval === 0); // Steady state: entire fault creeping
 
-  var colorDeep = (!eqFlash) ? colorActive : colorInactive;
-  var widthDeep = (!eqFlash) ? widthActive : widthInactive;
+  var colorShallow = allActive ? colorActive : (eqFlash ? colorActive : colorInactive);
+  var widthShallow = allActive ? widthActive : (eqFlash ? widthActive : widthInactive);
+
+  var colorDeep = allActive ? colorActive : ((!eqFlash) ? colorActive : colorInactive);
+  var widthDeep = allActive ? widthActive : ((!eqFlash) ? widthActive : widthInactive);
 
   // Draw Deep (Creeping)
   ctxFault.strokeStyle = colorDeep;
