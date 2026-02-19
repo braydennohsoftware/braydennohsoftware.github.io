@@ -151,9 +151,13 @@ const ctxTopo   = canvasTopo.getContext("2d");
 const ctxUplift = canvasUplift.getContext("2d");
 const ctxFault  = canvasFault.getContext("2d");
 
-canvasTopo.width = 800;   canvasTopo.height = 200;
-canvasUplift.width = 800; canvasUplift.height = 160;
-canvasFault.width = 800;  canvasFault.height = 200;
+var DPR = window.devicePixelRatio || 1;
+canvasTopo.width = 800 * DPR;   canvasTopo.height = 200 * DPR;
+canvasUplift.width = 800 * DPR; canvasUplift.height = 160 * DPR;
+canvasFault.width = 800 * DPR;  canvasFault.height = 200 * DPR;
+ctxTopo.scale(DPR, DPR);
+ctxUplift.scale(DPR, DPR);
+ctxFault.scale(DPR, DPR);
 
 const btnPlay  = document.getElementById("btn-play");
 const btnPause = document.getElementById("btn-pause");
@@ -242,9 +246,6 @@ function drawPlot(ctx, cw, ch, opts) {
       ctx.arc(ncx, ncy, 5, 0, 2 * Math.PI);
       ctx.fillStyle = "#084594";
       ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
     }
   }
 }
@@ -416,8 +417,8 @@ var faultTr = null;
 
 function getCanvasCoords(canvas, e) {
   var rect = canvas.getBoundingClientRect();
-  var sx = canvas.width / rect.width;
-  var sy = canvas.height / rect.height;
+  var sx = canvas.width / (rect.width * DPR);
+  var sy = canvas.height / (rect.height * DPR);
   var cx = e.touches ? e.touches[0].clientX : e.clientX;
   var cy = e.touches ? e.touches[0].clientY : e.clientY;
   return { x: (cx - rect.left) * sx, y: (cy - rect.top) * sy };
@@ -485,7 +486,7 @@ document.addEventListener("touchend", onUp);
    Section 7: Rendering
    ================================================================ */
 function renderFault() {
-  var cw = canvasFault.width, ch = canvasFault.height;
+  var cw = canvasFault.width / DPR, ch = canvasFault.height / DPR;
   faultTr = makePlotTransform(cw, ch, 0, X_END, -50, 10);
   drawPlot(ctxFault, cw, ch, {
     transform: faultTr,
@@ -525,7 +526,7 @@ function renderFault() {
 }
 
 function renderUplift() {
-  var cw = canvasUplift.width, ch = canvasUplift.height;
+  var cw = canvasUplift.width / DPR, ch = canvasUplift.height / DPR;
   var uMin = 0, uMax = 0;
   for (var i = 0; i < NX; i++) {
     if (upliftRate[i] < uMin) uMin = upliftRate[i];
@@ -560,7 +561,7 @@ function renderUplift() {
 }
 
 function renderTopo() {
-  var cw = canvasTopo.width, ch = canvasTopo.height;
+  var cw = canvasTopo.width / DPR, ch = canvasTopo.height / DPR;
   var zMin2 = 0, zMax2 = 0;
   for (var i = 0; i < NX; i++) {
     if (topoZ[i] < zMin2) zMin2 = topoZ[i];
