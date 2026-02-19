@@ -1,0 +1,208 @@
+---
+layout: default
+title:  Chaos in River Channel Evolution
+---
+
+<p>
+<a href="index.html">Brayden Noh Bookshelf</a>
+</p>
+
+Chaos Theory &bull; Geomorphology &bull; Nonlinear Dynamics
+
+<h1>Cutoffs as a Sufficient Condition for Chaos in Kinematic River Channel Evolution</h1>
+<h3>by Brayden Noh and Omar Wani</h3>
+
+<p>A tutorial introduction to how meander cutoffs generate deterministic chaos in river systems.</p>
+
+<!-- table of contents -->
+
+<div class='toc'>
+
+Contents
+
+<ul>
+  <li><a href="#introduction">1. Introduction</a></li>
+  <li><a href="#what-is-chaos">2. What Is Chaos?</a></li>
+  <li><a href="#the-river-model">3. The River Model</a>
+    <ul>
+      <li><a href="#kinematic-meander">3.1 Kinematic Meander Migration</a></li>
+      <li><a href="#cutoffs">3.2 What Are Cutoffs?</a></li>
+      <li><a href="#eulerian-grid">3.3 The Eulerian Grid Trick</a></li>
+    </ul>
+  </li>
+  <li><a href="#measuring-chaos">4. Measuring Chaos</a>
+    <ul>
+      <li><a href="#hamming-distance">4.1 Hamming Distance</a></li>
+      <li><a href="#lyapunov">4.2 The Lyapunov Exponent</a></li>
+    </ul>
+  </li>
+  <li><a href="#the-experiment">5. The Experiment</a></li>
+  <li><a href="#visualization">6. Visualization</a></li>
+  <li><a href="#key-findings">7. Key Findings</a></li>
+  <li><a href="#implications">8. Implications</a></li>
+</ul>
+</div>
+
+
+<h2 id="introduction">1. Introduction</h2>
+
+<p>
+Lowland rivers are dynamic systems. Their meander bends grow gradually over time, snaking back and forth across the floodplain. But every so often, something dramatic happens: a <b>cutoff</b>. A growing bend loops back on itself, the river shortcuts through the neck, and an entire meander loop is severed and abandoned as an oxbow lake.
+</p>
+
+<p>
+These cutoff events abruptly reshape channel geometry and reduce sinuosity. They play a critical role in both local and nonlocal channel dynamics &mdash; accelerating bend migration and triggering reorganizations that extend well beyond the immediate cutoff reach. When cutoffs cluster or cascade along the channel, they can trigger additional nearby cutoffs, producing avalanching sequences that resemble self-organized critical behavior.
+</p>
+
+<p>
+But here's the deeper question: are cutoffs sufficient to make river evolution <b>chaotic</b>? That is, can two rivers that start almost identically end up looking completely different, just because of cutoffs? This project answers that question with a definitive <i>yes</i>.
+</p>
+
+
+<h2 id="what-is-chaos">2. What Is Chaos?</h2>
+
+<p>
+In a chaotic system, infinitesimal differences in initial conditions grow <b>exponentially</b> over time. This is sometimes called the "butterfly effect" &mdash; a tiny perturbation today leads to a vastly different outcome tomorrow.
+</p>
+
+<p>
+Formally, chaos is characterized by a positive <b>Lyapunov exponent</b>. If two nearly identical systems are set running side by side and their difference grows exponentially, the growth rate of that difference is the Lyapunov exponent. A positive value means chaos; zero or negative means predictable.
+</p>
+
+<p>
+The key consequence of chaos is a <b>finite predictability horizon</b>. No matter how precisely you measure a river's current state, your forecast will eventually fail because small measurement errors amplify exponentially.
+</p>
+
+
+<h2 id="the-river-model">3. The River Model</h2>
+
+<h3 id="kinematic-meander">3.1 Kinematic Meander Migration</h3>
+
+<p>
+The model uses <b>meanderpy</b>, a kinematic meander model where the river is represented as a migrating centerline &mdash; a chain of nodes that evolves over time. The key rule is simple: <b>lateral migration is governed by curvature</b>. Where the river curves more sharply, it migrates faster. This single rule is enough to produce realistic-looking meander growth.
+</p>
+
+<p>
+As bends grow, the channel lengthens and the total node count changes over time. This makes the system high-dimensional and variable in size &mdash; a challenge for standard dynamical systems analysis.
+</p>
+
+<h3 id="cutoffs">3.2 What Are Cutoffs?</h3>
+
+<p>
+A <b>neck cutoff</b> occurs when the minimum distance between non-adjacent segments of the river falls below a critical threshold <code>d_c</code>. When this happens:
+</p>
+
+<ol>
+  <li>The neck is severed.</li>
+  <li>The intervening loop is excised.</li>
+  <li>The ends are reconnected, and the channel shortens.</li>
+  <li>Local geometry is reset.</li>
+</ol>
+
+<p>
+This is the topological event that, as this study shows, is the source of chaos. Without cutoffs, the river's evolution is entirely predictable. With cutoffs, it becomes chaotic.
+</p>
+
+<h3 id="eulerian-grid">3.3 The Eulerian Grid Trick</h3>
+
+<p>
+A major technical challenge is comparing two river configurations when the centerlines have different numbers of nodes. The solution is to map the Lagrangian centerline onto a <b>fixed Eulerian grid</b> &mdash; a regular 2D grid of cells where each cell is labeled as either channel (1) or floodplain (0).
+</p>
+
+<p>
+This produces a binary field <code>g(t) &isin; {0, 1}^M</code> that preserves planform geometry while providing a fixed-dimensional state suitable for direct comparison. The resolution of this grid can be varied (1 m to 1000 m) to test convergence.
+</p>
+
+
+<h2 id="measuring-chaos">4. Measuring Chaos</h2>
+
+<h3 id="hamming-distance">4.1 Hamming Distance</h3>
+
+<p>
+To quantify how two river trajectories diverge, the model uses the <b>Hamming distance</b>:
+</p>
+
+<pre><code>d_H(t) = ||S*(t) - S(t)||_1</code></pre>
+
+<p>
+This simply counts the number of grid cells where the two configurations differ &mdash; cells that are channel in one simulation but floodplain in the other, or vice versa. On the Eulerian grid, purple cells are shared by both trajectories, red cells belong only to the reference run, and blue cells belong only to the perturbed run.
+</p>
+
+<p>
+If this distance grows exponentially over time, the system is chaotic.
+</p>
+
+<h3 id="lyapunov">4.2 The Lyapunov Exponent</h3>
+
+<p>
+The <b>finite-time Lyapunov exponent (FTLE)</b> measures the rate of exponential separation:
+</p>
+
+<pre><code>&lambda;_FT = (t2 - t1)^(-1) * ln[d_H(t2) / d_H(t1)]</code></pre>
+
+<p>
+A positive &lambda; means exponential divergence &mdash; chaos. This is estimated from the slope of <code>log d_H(t)</code> during its linear growth phase.
+</p>
+
+
+<h2 id="the-experiment">5. The Experiment</h2>
+
+<p>
+The experiment is a controlled <b>on&ndash;off switch</b>:
+</p>
+
+<ol>
+  <li><b>Start</b> with two identical river simulations, except one has a single node nudged by a tiny amount.</li>
+  <li><b>Run both forward</b> with identical parameters for 10,000 years.</li>
+  <li><b>Case A &mdash; Cutoffs disabled:</b> The two rivers evolve in lockstep. The Hamming distance stays <i>identically zero</i> for the entire run. No divergence. No chaos.</li>
+  <li><b>Case B &mdash; Cutoffs enabled:</b> After the first cutoff event, the two rivers start to diverge. Red and blue regions expand on the Eulerian grid. The Hamming distance grows exponentially. Chaos.</li>
+</ol>
+
+<p>
+This clean on&ndash;off result demonstrates that cutoffs alone are <i>sufficient</i> to produce deterministic chaos in kinematic river models.
+</p>
+
+
+<h2 id="visualization">6. Visualization</h2>
+
+<p>
+The video below shows a time-lapse rendering of two paired river trajectories &mdash; one reference and one perturbed &mdash; evolving on the fixed Eulerian grid. Watch how the two channels start nearly identical and then diverge exponentially after cutoff events occur:
+</p>
+
+<video width="100%" controls>
+  <source src="assets/chaos-river-divergence.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+<p style="font-size: 85%; color: #767676;">
+<b>Supplementary Video 1.</b> Time-lapse of paired river trajectories showing exponential divergence driven by cutoff events. Purple indicates cells shared by both trajectories; red and blue indicate cells unique to each.
+</p>
+
+
+<h2 id="key-findings">7. Key Findings</h2>
+
+<ul>
+  <li><b>Cutoffs are the switch.</b> With cutoffs enabled, trajectories diverge exponentially. Without cutoffs, they don't diverge at all &mdash; ever.</li>
+  <li><b>The Lyapunov exponent converges.</b> As the Eulerian grid resolution is refined, the estimated Lyapunov exponent converges to a stable value. This is a real, resolution-independent property of the system.</li>
+  <li><b>Insensitive to perturbation size.</b> Whether you nudge a node by 1 meter or 0.001 meters, you get the same Lyapunov exponent. This is a hallmark of deterministic chaos.</li>
+  <li><b>Consistent across initial conditions.</b> Different starting river shapes produce the same growth rate.</li>
+  <li><b>Scales with migration rate.</b> Faster-migrating rivers are more chaotic (higher Lyapunov exponent), because faster migration means more frequent cutoffs.</li>
+  <li><b>Invariant to cutoff threshold.</b> The <i>magnitude</i> of the Lyapunov exponent doesn't depend on the cutoff distance <code>d_c</code>. The cutoff threshold only controls the <i>frequency</i> of topological resets.</li>
+</ul>
+
+
+<h2 id="implications">8. Implications</h2>
+
+<p>
+These findings have significant consequences:
+</p>
+
+<ul>
+  <li><b>Finite predictability horizon.</b> River planform evolution cannot be forecast indefinitely, even with a perfect model. The predictability horizon is bounded by the mode of cutoff formation.</li>
+  <li><b>Cutoffs as topological resets.</b> Each cutoff event acts as a local reset that amplifies upstream perturbations into global geometric differences.</li>
+  <li><b>Implications for floodplain risk.</b> Long-term predictions of channel position &mdash; and therefore flood risk &mdash; are fundamentally limited by this chaotic behavior.</li>
+</ul>
+
+<p>
+By Brayden Noh (Harvard, Dept. of Earth and Planetary Sciences) and Omar Wani (NYU Tandon School of Engineering).
+</p>
