@@ -10,7 +10,7 @@ title:  Fault to River Profile
 <h1>Fault to River Profile</h1>
 
 <p>
-<b>Drag the red nodes</b> on the fault panel to reshape the fault geometry.
+<b>Drag the nodes</b> on the fault panel to reshape the fault geometry.
 The uplift rate at any surface position is \( v = -V_{\text{slip}} \sin\theta \)
 where \( \theta \) is the dip of the fault segment directly below.
 The topography evolves via the stream-power equation
@@ -70,7 +70,7 @@ with drainage area from Hack's law \( A = (L - x)^h \).
   <div class="pnl-lbl">uplift rate</div>
   <canvas id="canvas-uplift"></canvas>
 
-  <div class="pnl-lbl">fault geometry &mdash; drag nodes</div>
+  <div class="pnl-lbl">fault geometry</div>
   <canvas id="canvas-fault" style="cursor: default;"></canvas>
 </div>
 
@@ -692,3 +692,4 @@ rebuildFromFault();
 
 })();
 </script>
+
