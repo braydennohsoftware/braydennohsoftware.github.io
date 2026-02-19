@@ -11,11 +11,7 @@ title:  Human-River Geomorphic Coupling
 <h3>by Brayden Noh and Omar Wani</h3>
 
 <p>
-Meandering rivers attract civilization &mdash; providing food, water, and transportation &mdash; but also destroy it when they shift course. <b>Human-River</b> couples these two forces into a single dynamical system on a cellular automaton.
-</p>
-
-<p>
-Each cell on a 2D grid is either <b>river</b>, <b>settlement</b>, or <b>empty floodplain</b>. Population is conserved: if the river drowns a settlement, it must relocate. Each cell's <b>utility</b> is
+Meandering rivers attract civilization but destroy it when they shift course. <b>Human-River</b> couples these forces into a single dynamical system. Each cell's utility is
 </p>
 
 \[
@@ -23,22 +19,400 @@ U(\mathbf{x}, t) \;=\; -\,w_d \, D(\mathbf{x}, t) \;+\; w_c \, C(\mathbf{x}, t)
 \]
 
 <p>
-where \(D\) is the distance to the nearest river cell, \(C\) is the number of occupied Moore neighbors, and \(w_d, w_c\) are tunable coupling weights. River cells have \(U = -\infty\).
+where \(D\) is distance to the river, \(C\) is the number of settlement neighbors, and \(\mu\) is a friction threshold for voluntary relocation. Press <b>Play</b> and tune the sliders.
 </p>
 
-<p>
-Two rules drive the dynamics each timestep:
-</p>
+<!-- ═══ Simulator ═══ -->
 
-<ol>
-  <li><b>Bulldozer.</b> Settlements drowned by the migrating river are erased and regrown at the highest-utility perimeter cell.</li>
-  <li><b>Crawl.</b> The worst settlement swaps with the best empty perimeter cell, but only if the utility gain exceeds a friction threshold \(\mu\).</li>
-</ol>
+<div id="sim-container" style="margin: 1.5rem 0;">
+  <canvas id="sim-canvas" style="width: 100%; image-rendering: pixelated; background: #000; border: 1px solid #ccc;"></canvas>
+</div>
 
-<p>
-<b><a href="human-river-sim">Try the interactive simulator &rarr;</a></b>
-</p>
+<div id="sim-info" style="font-family: monospace; font-size: 14px; margin-bottom: 0.5rem;">
+  Timestep: <span id="info-timestep">0</span> / 1000 &nbsp;&bull;&nbsp;
+  Population: <span id="info-pop">0</span> &nbsp;&bull;&nbsp;
+  Clusters: <span id="info-clusters">0</span>
+</div>
+<div id="sim-legend" style="font-family: monospace; font-size: 13px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 8px 16px;">
+  <span><span style="display:inline-block;width:12px;height:12px;background:#00f;vertical-align:middle;margin-right:3px;"></span>River</span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#ff8000;vertical-align:middle;margin-right:3px;"></span>Stable <span id="info-stable">0</span></span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#1aff1a;vertical-align:middle;margin-right:3px;"></span>New <span id="info-new">0</span></span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#fff;border:1px solid #999;vertical-align:middle;margin-right:3px;"></span>Abandoned <span id="info-abandoned">0</span></span>
+  <span><span style="display:inline-block;width:12px;height:12px;background:#ff1a1a;vertical-align:middle;margin-right:3px;"></span>Drowned <span id="info-drowned">0</span></span>
+</div>
+
+<div id="sim-controls" style="margin-bottom: 1.5rem;">
+  <div style="margin-bottom: 0.5rem;">
+    <button id="btn-play">Play</button>
+    <button id="btn-pause" disabled>Pause</button>
+    <button id="btn-reset">Reset</button>
+  </div>
+
+  <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; max-width: 460px;">
+    <label for="sl-wdist">\(w_d\)</label>
+    <input id="sl-wdist" type="range" min="0" max="10.0" step="0.1" value="1.0">
+    <span id="val-wdist">1.0</span>
+
+    <label for="sl-wcoh">\(w_c\)</label>
+    <input id="sl-wcoh" type="range" min="0" max="10.0" step="0.1" value="2.0">
+    <span id="val-wcoh">2.0</span>
+
+    <label for="sl-friction">\(\mu\)</label>
+    <input id="sl-friction" type="range" min="0" max="2.0" step="0.05" value="0.5">
+    <span id="val-friction">0.5</span>
+
+    <label for="sl-pop">Population</label>
+    <input id="sl-pop" type="range" min="100" max="10000" step="100" value="1000">
+    <span id="val-pop">1000</span>
+
+    <label for="sl-crawl">Crawl speed</label>
+    <input id="sl-crawl" type="range" min="1" max="30" step="1" value="10">
+    <span id="val-crawl">10</span>
+
+    <label for="sl-speed">Frame delay</label>
+    <input id="sl-speed" type="range" min="0" max="200" step="10" value="50">
+    <span id="val-speed">50 ms</span>
+  </div>
+</div>
+
+<p id="loading-msg"><i>Loading river data&hellip;</i></p>
 
 <p style="font-size: 85%;">
 By Brayden Noh (Harvard, Dept. of Earth and Planetary Sciences) and Omar Wani (NYU Tandon School of Engineering).
 </p>
+
+<script>
+(function() {
+"use strict";
+
+// ── Grid constants ──
+const CELL_SIZE = 50;
+const XMIN = 1000, XMAX = 9000;
+const YMIN = -2000, YMAX = 2000;
+const COLS = Math.round((XMAX - XMIN) / CELL_SIZE);
+const ROWS = Math.round((YMAX - YMIN) / CELL_SIZE);
+const N = ROWS * COLS;
+
+// 8-connected neighbor offsets
+const OFFSETS_DR = [-1,-1,-1, 0, 0, 1, 1, 1];
+const OFFSETS_DC = [-1, 0, 1,-1, 1,-1, 0, 1];
+
+// ── State ──
+let riverTimesteps = null;
+let village, prevVillage, river, neighbors, dist;
+let playing = false;
+let currentStep = 0;
+let animFrameId = null;
+let lastFrameTime = 0;
+
+// ── DOM refs ──
+const canvas = document.getElementById("sim-canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = COLS;
+canvas.height = ROWS;
+
+const infoStep = document.getElementById("info-timestep");
+const infoPop = document.getElementById("info-pop");
+const infoClusters = document.getElementById("info-clusters");
+const loadingMsg = document.getElementById("loading-msg");
+
+const btnPlay = document.getElementById("btn-play");
+const btnPause = document.getElementById("btn-pause");
+const btnReset = document.getElementById("btn-reset");
+
+const sliders = {
+  wdist:    { el: document.getElementById("sl-wdist"),    valEl: document.getElementById("val-wdist"),    fmt: v => v },
+  wcoh:     { el: document.getElementById("sl-wcoh"),     valEl: document.getElementById("val-wcoh"),     fmt: v => v },
+  friction: { el: document.getElementById("sl-friction"), valEl: document.getElementById("val-friction"), fmt: v => v },
+  pop:      { el: document.getElementById("sl-pop"),      valEl: document.getElementById("val-pop"),      fmt: v => v },
+  crawl:    { el: document.getElementById("sl-crawl"),    valEl: document.getElementById("val-crawl"),    fmt: v => v },
+  speed:    { el: document.getElementById("sl-speed"),    valEl: document.getElementById("val-speed"),    fmt: v => v + " ms" },
+};
+
+function getParam(name) { return parseFloat(sliders[name].el.value); }
+
+for (const key of Object.keys(sliders)) {
+  const s = sliders[key];
+  s.el.addEventListener("input", () => { s.valEl.textContent = s.fmt(s.el.value); });
+}
+
+// ══════════════════════════════════════════
+// 1. River Loader
+// ══════════════════════════════════════════
+async function loadRiverData() {
+  const resp = await fetch("assets/river_data.json");
+  const data = await resp.json();
+  riverTimesteps = data.timesteps;
+  loadingMsg.style.display = "none";
+}
+
+// ══════════════════════════════════════════
+// 2. Rasterize channel (Bresenham)
+// ══════════════════════════════════════════
+function rasterizeChannel(flatCoords) {
+  const grid = new Uint8Array(N);
+  const nPts = flatCoords.length / 2;
+  for (let i = 0; i < nPts - 1; i++) {
+    let x0 = flatCoords[i * 2], y0 = flatCoords[i * 2 + 1];
+    let x1 = flatCoords[(i + 1) * 2], y1 = flatCoords[(i + 1) * 2 + 1];
+    let c0 = Math.round((x0 - XMIN) / CELL_SIZE);
+    let r0 = Math.round((y0 - YMIN) / CELL_SIZE);
+    let c1 = Math.round((x1 - XMIN) / CELL_SIZE);
+    let r1 = Math.round((y1 - YMIN) / CELL_SIZE);
+    let dc = Math.abs(c1 - c0), dr = Math.abs(r1 - r0);
+    let sc = c0 < c1 ? 1 : -1, sr = r0 < r1 ? 1 : -1;
+    let err = dc - dr;
+    while (true) {
+      if (r0 >= 0 && r0 < ROWS && c0 >= 0 && c0 < COLS) grid[r0 * COLS + c0] = 1;
+      if (r0 === r1 && c0 === c1) break;
+      let e2 = 2 * err;
+      if (e2 > -dr) { err -= dr; c0 += sc; }
+      if (e2 <  dc) { err += dc; r0 += sr; }
+    }
+  }
+  return grid;
+}
+
+// ══════════════════════════════════════════
+// 3. Distance Transform (Felzenszwalb 2D EDT)
+// ══════════════════════════════════════════
+function distanceTransform(riverGrid) {
+  const INF = 1e10;
+  const f = new Float32Array(N);
+  const d = new Float32Array(N);
+  for (let i = 0; i < N; i++) f[i] = riverGrid[i] ? 0 : INF;
+
+  const colBuf = new Float32Array(ROWS);
+  for (let c = 0; c < COLS; c++) {
+    colBuf[0] = f[0 * COLS + c];
+    for (let r = 1; r < ROWS; r++) colBuf[r] = Math.min(f[r * COLS + c], colBuf[r - 1] + 1);
+    for (let r = ROWS - 2; r >= 0; r--) colBuf[r] = Math.min(colBuf[r], colBuf[r + 1] + 1);
+    for (let r = 0; r < ROWS; r++) f[r * COLS + c] = colBuf[r] * colBuf[r];
+  }
+
+  const v = new Int32Array(COLS);
+  const z = new Float32Array(COLS + 1);
+  const rowD = new Float32Array(COLS);
+  for (let r = 0; r < ROWS; r++) {
+    const off = r * COLS;
+    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for (let q = 1; q < COLS; q++) {
+      let s = ((f[off + q] + q * q) - (f[off + v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (s <= z[k]) { k--; s = ((f[off + q] + q * q) - (f[off + v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+      k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 0; q < COLS; q++) {
+      while (z[k + 1] < q) k++;
+      let dq = q - v[k]; rowD[q] = dq * dq + f[off + v[k]];
+    }
+    for (let q = 0; q < COLS; q++) d[off + q] = Math.sqrt(rowD[q]);
+  }
+  return d;
+}
+
+// ══════════════════════════════════════════
+// 4. Village CA Engine
+// ══════════════════════════════════════════
+function updateNeighbors(r, c, delta) {
+  for (let i = 0; i < 8; i++) {
+    const rr = r + OFFSETS_DR[i], cc = c + OFFSETS_DC[i];
+    if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) neighbors[rr * COLS + cc] += delta;
+  }
+}
+
+function computeBaseU(distGrid, riverGrid, wDist) {
+  const baseU = new Float32Array(N);
+  for (let i = 0; i < N; i++) baseU[i] = riverGrid[i] ? -1e20 : -(distGrid[i] * wDist);
+  return baseU;
+}
+
+function getBestPerimeter(baseU, wCoh) {
+  let bestScore = -Infinity, bestIdx = -1;
+  for (let i = 0; i < N; i++) {
+    if (village[i] || river[i] || neighbors[i] === 0) continue;
+    const score = baseU[i] + neighbors[i] * wCoh;
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  if (bestIdx === -1) {
+    for (let i = 0; i < N; i++) {
+      if (village[i] || river[i]) continue;
+      const score = baseU[i] + neighbors[i] * wCoh;
+      if (score > bestScore) { bestScore = score; bestIdx = i; }
+    }
+  }
+  return { idx: bestIdx, score: bestScore };
+}
+
+function getWorstVillage(baseU, wCoh) {
+  let worstScore = Infinity, worstIdx = -1;
+  for (let i = 0; i < N; i++) {
+    if (!village[i]) continue;
+    const score = baseU[i] + neighbors[i] * wCoh;
+    if (score < worstScore) { worstScore = score; worstIdx = i; }
+  }
+  return { idx: worstIdx, score: worstScore };
+}
+
+function caStep(baseU, wCoh, friction, crawlSpeed) {
+  const drowned = [];
+  for (let i = 0; i < N; i++) { if (village[i] && river[i]) drowned.push(i); }
+  for (const idx of drowned) { const r = (idx / COLS) | 0, c = idx % COLS; village[idx] = 0; updateNeighbors(r, c, -1); }
+  for (let d = 0; d < drowned.length; d++) {
+    const best = getBestPerimeter(baseU, wCoh);
+    if (best.idx >= 0) { village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); }
+  }
+  for (let s = 0; s < crawlSpeed; s++) {
+    const worst = getWorstVillage(baseU, wCoh);
+    if (worst.idx < 0) break;
+    const best = getBestPerimeter(baseU, wCoh);
+    if (best.idx < 0) break;
+    if (best.score > worst.score + friction) {
+      const wr = (worst.idx / COLS) | 0, wc = worst.idx % COLS; village[worst.idx] = 0; updateNeighbors(wr, wc, -1);
+      village[best.idx] = 1; const br = (best.idx / COLS) | 0, bc = best.idx % COLS; updateNeighbors(br, bc, 1);
+    } else break;
+  }
+}
+
+function countClusters() {
+  const visited = new Uint8Array(N);
+  let count = 0; const queue = [];
+  for (let i = 0; i < N; i++) {
+    if (!village[i] || visited[i]) continue;
+    count++; queue.length = 0; queue.push(i); visited[i] = 1;
+    while (queue.length > 0) {
+      const idx = queue.pop(); const r = (idx / COLS) | 0, c = idx % COLS;
+      for (let d = 0; d < 8; d++) {
+        const rr = r + OFFSETS_DR[d], cc = c + OFFSETS_DC[d];
+        if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) { const ni = rr * COLS + cc; if (village[ni] && !visited[ni]) { visited[ni] = 1; queue.push(ni); } }
+      }
+    }
+  }
+  return count;
+}
+
+// ══════════════════════════════════════════
+// 5. Initialization
+// ══════════════════════════════════════════
+function initVillage() {
+  const wDist = getParam("wdist"), wCoh = getParam("wcoh"), friction = getParam("friction"), pop = getParam("pop");
+  currentStep = 0;
+  river = rasterizeChannel(riverTimesteps[0]);
+  dist = distanceTransform(river);
+  const baseU = computeBaseU(dist, river, wDist);
+  village = new Uint8Array(N); neighbors = new Int16Array(N);
+
+  let bestStartScore = -Infinity, bestStartIdx = 0;
+  const centerR = ROWS / 2, centerC = COLS / 2;
+  for (let i = 0; i < N; i++) {
+    if (river[i]) continue;
+    const r = (i / COLS) | 0, c = i % COLS;
+    const dCenter = Math.sqrt((r - centerR) * (r - centerR) + (c - centerC) * (c - centerC));
+    const score = baseU[i] - dCenter * 0.05;
+    if (score > bestStartScore) { bestStartScore = score; bestStartIdx = i; }
+  }
+  village[bestStartIdx] = 1;
+  const sr = (bestStartIdx / COLS) | 0, sc = bestStartIdx % COLS;
+  updateNeighbors(sr, sc, 1);
+
+  for (let g = 1; g < pop; g++) {
+    const best = getBestPerimeter(baseU, wCoh);
+    if (best.idx >= 0) { village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); }
+  }
+  for (let b = 0; b < 150; b++) caStep(baseU, wCoh, friction, 10);
+  prevVillage = new Uint8Array(village);
+  render(); updateInfo();
+}
+
+// ══════════════════════════════════════════
+// 6. Canvas Renderer
+// ══════════════════════════════════════════
+const imgData = ctx.createImageData(COLS, ROWS);
+
+function render() {
+  const pixels = imgData.data;
+  for (let i = 0; i < N; i++) {
+    const off = i * 4, wasV = prevVillage[i], nowV = village[i], nowR = river[i];
+    if (wasV && nowR)                { pixels[off]=255; pixels[off+1]=26;  pixels[off+2]=26;  pixels[off+3]=255; }
+    else if (wasV && nowV)           { pixels[off]=255; pixels[off+1]=128; pixels[off+2]=0;   pixels[off+3]=255; }
+    else if (!wasV && nowV)          { pixels[off]=26;  pixels[off+1]=255; pixels[off+2]=26;  pixels[off+3]=255; }
+    else if (wasV && !nowV && !nowR) { pixels[off]=255; pixels[off+1]=255; pixels[off+2]=255; pixels[off+3]=255; }
+    else if (nowR)                   { pixels[off]=0;   pixels[off+1]=0;   pixels[off+2]=255; pixels[off+3]=255; }
+    else                             { pixels[off]=0;   pixels[off+1]=0;   pixels[off+2]=0;   pixels[off+3]=255; }
+  }
+  const flipped = ctx.createImageData(COLS, ROWS); const fp = flipped.data;
+  for (let r = 0; r < ROWS; r++) {
+    const srcOff = r * COLS * 4, dstOff = (ROWS - 1 - r) * COLS * 4;
+    for (let c = 0; c < COLS * 4; c++) fp[dstOff + c] = pixels[srcOff + c];
+  }
+  ctx.putImageData(flipped, 0, 0);
+}
+
+const infoStable = document.getElementById("info-stable");
+const infoNew = document.getElementById("info-new");
+const infoAbandoned = document.getElementById("info-abandoned");
+const infoDrowned = document.getElementById("info-drowned");
+
+function updateInfo() {
+  infoStep.textContent = currentStep;
+  let pop = 0, nStable = 0, nNew = 0, nAbandoned = 0, nDrowned = 0;
+  for (let i = 0; i < N; i++) {
+    const wasV = prevVillage[i], nowV = village[i], nowR = river[i];
+    if (nowV) pop++;
+    if (wasV && nowR)               nDrowned++;
+    else if (wasV && nowV)          nStable++;
+    else if (!wasV && nowV)         nNew++;
+    else if (wasV && !nowV && !nowR) nAbandoned++;
+  }
+  infoPop.textContent = pop; infoClusters.textContent = countClusters();
+  infoStable.textContent = nStable; infoNew.textContent = nNew;
+  infoAbandoned.textContent = nAbandoned; infoDrowned.textContent = nDrowned;
+}
+
+// ══════════════════════════════════════════
+// 7. Animation Loop
+// ══════════════════════════════════════════
+function step() {
+  if (currentStep >= riverTimesteps.length - 1) { pause(); return; }
+  currentStep++;
+  const wDist = getParam("wdist"), wCoh = getParam("wcoh"), friction = getParam("friction"), crawlSpeed = getParam("crawl");
+  prevVillage = new Uint8Array(village);
+  river = rasterizeChannel(riverTimesteps[currentStep]);
+  dist = distanceTransform(river);
+  const baseU = computeBaseU(dist, river, wDist);
+  caStep(baseU, wCoh, friction, crawlSpeed);
+  render(); updateInfo();
+}
+
+function animate(timestamp) {
+  if (!playing) return;
+  const delay = getParam("speed");
+  if (timestamp - lastFrameTime >= delay) { lastFrameTime = timestamp; step(); }
+  animFrameId = requestAnimationFrame(animate);
+}
+
+function play() {
+  if (!riverTimesteps) return;
+  playing = true; btnPlay.disabled = true; btnPause.disabled = false;
+  lastFrameTime = performance.now(); animFrameId = requestAnimationFrame(animate);
+}
+function pause() { playing = false; btnPlay.disabled = false; btnPause.disabled = true; if (animFrameId) cancelAnimationFrame(animFrameId); }
+function reset() { pause(); initVillage(); }
+
+btnPlay.addEventListener("click", play);
+btnPause.addEventListener("click", pause);
+btnReset.addEventListener("click", reset);
+
+sliders.pop.el.addEventListener("change", () => {
+  if (!riverTimesteps) return;
+  const targetPop = getParam("pop"), wDist = getParam("wdist"), wCoh = getParam("wcoh");
+  const baseU = computeBaseU(dist, river, wDist);
+  let currentPop = 0; for (let i = 0; i < N; i++) if (village[i]) currentPop++;
+  while (currentPop < targetPop) { const best = getBestPerimeter(baseU, wCoh); if (best.idx < 0) break; village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); currentPop++; }
+  while (currentPop > targetPop) { const worst = getWorstVillage(baseU, wCoh); if (worst.idx < 0) break; village[worst.idx] = 0; const wr = (worst.idx / COLS) | 0, wc = worst.idx % COLS; updateNeighbors(wr, wc, -1); currentPop--; }
+  render(); updateInfo();
+});
+
+loadRiverData().then(() => { initVillage(); });
+})();
+</script>
