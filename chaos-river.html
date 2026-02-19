@@ -22,22 +22,6 @@ To test this, we ran pairs of simulations using <a href="https://github.com/zsyl
 The challenge is that the river geometry changes length over time, so we can't directly compare two Lagrangian state vectors. Instead, we map each centerline onto a fixed Eulerian grid of binary cells: channel (1) or floodplain (0), which gives us a fixed-dimensional state for comparison.
 </p>
 
-<img src="assets/fig1-lagrangian-eulerian.png" alt="Lagrangian and Eulerian representations of the meander model" style="width: 100%; margin: 1em 0;">
-
-<p style="font-size: 85%; color: #767676;">
-<b>Figure 1.</b> (a) 100 ensemble centerlines in Lagrangian form. (b&ndash;d) The same state mapped onto Eulerian grids at 10 m, 50 m, and 100 m resolution.
-</p>
-
-<p>
-We measure divergence between two runs using the Hamming distance \(d_H(t) = \|\mathbf{S}^*(t) - \mathbf{S}(t)\|_1\), which counts the number of grid cells that differ. If this grows exponentially, the system is chaotic. The rate of growth is the finite-time Lyapunov exponent:
-</p>
-
-\[\lambda_{\text{FT}} = (t_2 - t_1)^{-1} \ln\!\left[\frac{d_H(t_2)}{d_H(t_1)}\right]\]
-
-<p>
-The result is clean. With cutoffs disabled, the two trajectories remain identical &mdash; \(d_H(t) = 0\) for the entire run. With cutoffs enabled, they diverge exponentially. The video below shows this divergence in action:
-</p>
-
 <!-- Interactive Chaos-River Divergence Simulator -->
 <div id="chaos-sim" style="margin: 1em 0;">
   <div style="display:flex; flex-wrap:wrap; align-items:center; gap:0.5em 0.8em; margin-bottom:0.5em; font-size:80%;">
@@ -61,7 +45,17 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
 </div>
 
 <p style="font-size: 85%; color: #767676;">
-<b>Figure 2.</b> Interactive Eulerian occupancy heatmap of 100 ensemble simulations with cutoffs enabled. Drag the grid slider to change resolution continuously (10&ndash;100 m); scrub through time to see trajectories diverge.
+<b>Figure 1.</b> Interactive Eulerian occupancy heatmap of 100 ensemble simulations with cutoffs enabled. Drag the grid slider to change resolution continuously (10&ndash;100 m); scrub through time to see trajectories diverge.
+</p>
+
+<p>
+We measure divergence between two runs using the Hamming distance \(d_H(t) = \|\mathbf{S}^*(t) - \mathbf{S}(t)\|_1\), which counts the number of grid cells that differ. If this grows exponentially, the system is chaotic. The rate of growth is the finite-time Lyapunov exponent:
+</p>
+
+\[\lambda_{\text{FT}} = (t_2 - t_1)^{-1} \ln\!\left[\frac{d_H(t_2)}{d_H(t_1)}\right]\]
+
+<p>
+The result is clean. With cutoffs disabled, the two trajectories remain identical &mdash; \(d_H(t) = 0\) for the entire run. With cutoffs enabled, they diverge exponentially.
 </p>
 
 <script>
