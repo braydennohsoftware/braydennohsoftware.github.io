@@ -119,7 +119,7 @@ for (var i = 0; i < NX; i++) {
   upliftRed[i]  = UPLIFT_RED_RAW[i] * 1e-6;
   upliftBlue[i] = UPLIFT_BLUE_RAW[i] * 1e-6;
   var Lx = X_END - xGrid[i];
-  DA[i] = Math.max(Math.pow(Math.max(Lx, 0), H_EXP), 10.0);
+  DA[i] = Math.max(Math.pow(Math.max(Lx, 0), H_EXP), 1.0);
 }
 
 /* ================================================================
