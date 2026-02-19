@@ -45,13 +45,10 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
     <button id="chaos-reset" style="padding:0.2em 0.8em; cursor:pointer;">Reset</button>
     <input type="range" id="chaos-scrub" min="0" max="200" value="0" style="flex:1; min-width:120px;">
     <label style="white-space:nowrap;">Delay: <input type="range" id="chaos-delay" min="0" max="200" value="50" style="width:60px; vertical-align:middle;"> <span id="chaos-delay-val">50</span>ms</label>
-    <label style="white-space:nowrap;">Grid:
-      <select id="chaos-grid"><option value="50">50 m</option><option value="100">100 m</option></select>
-    </label>
-    <label style="white-space:nowrap;"><input type="checkbox" id="chaos-ref" checked> Reference</label>
+    <label style="white-space:nowrap;">Grid: <input type="range" id="chaos-grid" min="10" max="100" step="5" value="50" style="width:70px; vertical-align:middle;"> <span id="chaos-grid-val">50</span> m</label>
   </div>
   <div style="position:relative; line-height:0;">
-    <canvas id="chaos-canvas" width="720" height="360" style="width:100%; background:#1a1a2e; display:block;"></canvas>
+    <canvas id="chaos-canvas" width="720" height="360" style="width:100%; background:#1a1a2e; display:block; image-rendering:pixelated; image-rendering:crisp-edges;"></canvas>
     <div id="chaos-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:90%;">Loading data&hellip;</div>
   </div>
   <div style="display:flex; align-items:center; gap:0.4em; margin-top:0.3em;">
@@ -64,48 +61,97 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
 </div>
 
 <p style="font-size: 85%; color: #767676;">
-<b>Figure 2.</b> Interactive Eulerian occupancy heatmap of 100 ensemble simulations with cutoffs enabled. Scrub through time to see trajectories diverge.
+<b>Figure 2.</b> Interactive Eulerian occupancy heatmap of 100 ensemble simulations with cutoffs enabled. Drag the grid slider to change resolution continuously (10&ndash;100 m); scrub through time to see trajectories diverge.
 </p>
 
 <script>
 (function () {
   "use strict";
 
-  var CANVAS_W = 720, CANVAS_H = 360;
+  var SKIP = 10; /* skip first 10 frames (artefacts before cutoffs kick in) */
 
   var state = {
-    data: {},
-    size: 50,
-    frame: 0,
+    grids: null,   /* flat Uint8Array: n_timesteps * BASE_ROWS * BASE_COLS */
+    meta: null,
+    lut: null,     /* RGBA colormap, 101 entries */
+    gridSize: 50,  /* current display resolution (m) */
+    frame: SKIP,
     playing: false,
     timer: null,
-    delay: 50,
-    showRef: true
+    delay: 50
   };
 
   var canvas = document.getElementById("chaos-canvas");
   var ctx = canvas.getContext("2d");
   var loadingEl = document.getElementById("chaos-loading");
 
-  /* off-screen buffer for heatmap (avoids per-cell fillRect) */
+  /* HiDPI: size canvas to actual device pixels for crisp rendering */
+  var dpr = window.devicePixelRatio || 1;
+  function sizeCanvas() {
+    var rect = canvas.getBoundingClientRect();
+    canvas.width  = Math.round(rect.width  * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+  }
+  sizeCanvas();
+  window.addEventListener("resize", function () { sizeCanvas(); renderFrame(); });
+
+  /* off-screen buffer sized to the output grid */
   var buf = document.createElement("canvas");
   var bufCtx = buf.getContext("2d");
 
-  /* --- data loading --- */
-  function loadData(cellSize, cb) {
-    if (state.data[cellSize]) return cb();
+  /* ---- load PNG sprite-sheet + JSON metadata ---- */
+  function loadAll(cb) {
+    var metaDone = false, imgDone = false;
+    var metaObj, spriteImg;
+
+    /* metadata */
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "assets/chaos_occupancy_" + cellSize + "m.json");
+    xhr.open("GET", "assets/chaos_meta.json");
     xhr.onload = function () {
-      var json = JSON.parse(xhr.responseText);
-      /* decode base64 grids */
-      var raw = atob(json.grids);
-      var arr = new Uint8Array(raw.length);
-      for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-      json.gridsArr = arr;
-      delete json.grids;
-      /* pre-build RGBA colormap LUT (101 entries × 4 bytes) */
-      var cmap = json.colormap;
+      metaObj = JSON.parse(xhr.responseText);
+      metaDone = true;
+      if (imgDone) finish();
+    };
+    xhr.send();
+
+    /* sprite PNG */
+    spriteImg = new Image();
+    spriteImg.onload = function () {
+      imgDone = true;
+      if (metaDone) finish();
+    };
+    spriteImg.src = "assets/chaos_occupancy.png";
+
+    function finish() {
+      var m = metaObj;
+      var BC = m.base_cols, BR = m.base_rows, TPR = m.tiles_per_row;
+      var N = m.n_timesteps;
+
+      /* draw sprite to off-screen canvas, extract R channel */
+      var tmp = document.createElement("canvas");
+      tmp.width = spriteImg.width;
+      tmp.height = spriteImg.height;
+      var tmpCtx = tmp.getContext("2d");
+      tmpCtx.drawImage(spriteImg, 0, 0);
+      var full = tmpCtx.getImageData(0, 0, tmp.width, tmp.height).data;
+
+      var grids = new Uint8Array(N * BR * BC);
+      for (var i = 0; i < N; i++) {
+        var tc = i % TPR, tr = (i / TPR) | 0;
+        var tileY = tr * BR, tileX = tc * BC;
+        for (var r = 0; r < BR; r++) {
+          var srcOff = ((tileY + r) * tmp.width + tileX) * 4;
+          var dstOff = i * BR * BC + r * BC;
+          for (var c = 0; c < BC; c++) {
+            grids[dstOff + c] = full[srcOff + c * 4]; /* R channel */
+          }
+        }
+      }
+      state.grids = grids;
+      state.meta = m;
+
+      /* build RGBA LUT */
+      var cmap = m.colormap;
       var lut = new Uint8Array(101 * 4);
       for (var v = 0; v <= 100; v++) {
         lut[v * 4]     = cmap[v * 3];
@@ -113,83 +159,80 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
         lut[v * 4 + 2] = cmap[v * 3 + 2];
         lut[v * 4 + 3] = 255;
       }
-      json.lut = lut;
-      state.data[cellSize] = json;
+      state.lut = lut;
+
       cb();
-    };
-    xhr.send();
+    }
   }
 
-  /* --- rendering --- */
+  /* ---- rendering: downsample from base grid via block-max ---- */
   function renderFrame() {
-    var d = state.data[state.size];
-    if (!d) return;
-    var m = d.meta, cols = m.cols, rows = m.rows;
-    var lut = d.lut;
-    var off = state.frame * rows * cols;
+    if (!state.grids) return;
+    var m = state.meta, lut = state.lut;
+    var BC = m.base_cols, BR = m.base_rows;
+    var G = state.gridSize, B = G / m.base_cell;
+    var outCols = Math.floor((m.xmax - m.xmin) / G);
+    var outRows = Math.floor((m.ymax - m.ymin) / G);
+    var frameOff = state.frame * BR * BC;
 
-    /* resize off-screen buffer if needed */
-    if (buf.width !== cols || buf.height !== rows) {
-      buf.width = cols;
-      buf.height = rows;
+    /* resize off-screen buffer */
+    if (buf.width !== outCols || buf.height !== outRows) {
+      buf.width = outCols; buf.height = outRows;
     }
-    var imgData = bufCtx.createImageData(cols, rows);
+    var imgData = bufCtx.createImageData(outCols, outRows);
     var px = imgData.data;
 
-    for (var r = 0; r < rows; r++) {
-      var srcRow = rows - 1 - r; /* flip y: row 0 in data = bottom */
-      for (var c = 0; c < cols; c++) {
-        var val = d.gridsArr[off + srcRow * cols + c];
-        var li = val * 4, di = (r * cols + c) * 4;
+    for (var r = 0; r < outRows; r++) {
+      var srcR0 = Math.floor(r * B);
+      var srcR1 = Math.min(Math.floor((r + 1) * B), BR);
+      var dispR = outRows - 1 - r; /* flip y */
+
+      for (var c = 0; c < outCols; c++) {
+        var srcC0 = Math.floor(c * B);
+        var srcC1 = Math.min(Math.floor((c + 1) * B), BC);
+
+        /* block-max */
+        var maxV = 0;
+        for (var sr = srcR0; sr < srcR1; sr++) {
+          var rowOff = frameOff + sr * BC;
+          for (var sc = srcC0; sc < srcC1; sc++) {
+            var v = state.grids[rowOff + sc];
+            if (v > maxV) maxV = v;
+          }
+        }
+
+        var li = maxV * 4, di = (dispR * outCols + c) * 4;
         px[di] = lut[li]; px[di+1] = lut[li+1]; px[di+2] = lut[li+2]; px[di+3] = 255;
       }
     }
     bufCtx.putImageData(imgData, 0, 0);
 
-    /* scale to main canvas (nearest-neighbour) */
+    /* scale to display canvas (nearest-neighbour, HiDPI-aware) */
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(buf, 0, 0, CANVAS_W, CANVAS_H);
-
-    /* reference centerline overlay */
-    if (state.showRef && d.ref_centerlines[state.frame]) {
-      var cl = d.ref_centerlines[state.frame];
-      var sx = CANVAS_W / (m.xmax - m.xmin);
-      var sy = CANVAS_H / (m.ymax - m.ymin);
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255,255,255,0.85)";
-      ctx.lineWidth = 2;
-      ctx.lineJoin = "round";
-      for (var i = 0; i < cl.length; i += 2) {
-        var px2 = (cl[i] - m.xmin) * sx;
-        var py2 = CANVAS_H - (cl[i + 1] - m.ymin) * sy;
-        if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
-      }
-      ctx.stroke();
-    }
+    ctx.drawImage(buf, 0, 0, canvas.width, canvas.height);
 
     updateInfo();
   }
 
   function updateInfo() {
-    var d = state.data[state.size];
-    if (!d) return;
-    var m = d.meta;
+    var m = state.meta;
+    if (!m) return;
     var t = state.frame * m.step;
     var yr = (t * m.dt_years).toFixed(1);
+    var maxT = (m.n_timesteps - 1) * m.step;
     document.getElementById("chaos-info").textContent =
-      "Timestep: " + t + " / " + ((m.n_timesteps - 1) * m.step) +
-      "  |  Time: " + yr + " yr  |  Grid: " + state.size + " m";
+      "Timestep: " + t + " / " + maxT +
+      "  |  Time: " + yr + " yr  |  Grid: " + state.gridSize + " m";
   }
 
-  /* --- colorbar --- */
+  /* ---- colorbar ---- */
   function drawColorbar() {
-    var d = state.data[state.size];
-    if (!d) return;
+    if (!state.lut) return;
     var cb = document.getElementById("chaos-colorbar");
     var cbCtx = cb.getContext("2d");
     var w = cb.width, h = cb.height;
     var img = cbCtx.createImageData(w, h);
-    var lut = d.lut;
+    var lut = state.lut;
     for (var x = 0; x < w; x++) {
       var val = Math.round(x / (w - 1) * 100);
       var li = val * 4;
@@ -202,11 +245,10 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
     cbCtx.putImageData(img, 0, 0);
   }
 
-  /* --- playback --- */
+  /* ---- playback ---- */
   function step() {
-    var d = state.data[state.size];
-    if (!d) return;
-    if (state.frame < d.meta.n_timesteps - 1) {
+    if (!state.meta) return;
+    if (state.frame < state.meta.n_timesteps - 1) {
       state.frame++;
       scrubEl.value = state.frame;
       renderFrame();
@@ -236,19 +278,18 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
 
   function reset() {
     pause();
-    state.frame = 0;
-    scrubEl.value = 0;
+    state.frame = SKIP;
+    scrubEl.value = SKIP;
     renderFrame();
   }
 
-  /* --- controls --- */
+  /* ---- controls ---- */
   var playBtn = document.getElementById("chaos-play");
   var scrubEl = document.getElementById("chaos-scrub");
   var delayEl = document.getElementById("chaos-delay");
   var delayVal = document.getElementById("chaos-delay-val");
-  var gridSel = document.getElementById("chaos-grid");
-  var refChk = document.getElementById("chaos-ref");
-
+  var gridSlider = document.getElementById("chaos-grid");
+  var gridVal = document.getElementById("chaos-grid-val");
   playBtn.addEventListener("click", function () {
     state.playing ? pause() : play();
   });
@@ -264,31 +305,21 @@ The result is clean. With cutoffs disabled, the two trajectories remain identica
     delayVal.textContent = this.value;
   });
 
-  gridSel.addEventListener("change", function () {
-    var wasPlaying = state.playing;
-    pause();
-    state.size = parseInt(this.value, 10);
-    loadData(state.size, function () {
-      drawColorbar();
-      renderFrame();
-      if (wasPlaying) play();
-    });
-  });
-
-  refChk.addEventListener("change", function () {
-    state.showRef = this.checked;
+  gridSlider.addEventListener("input", function () {
+    state.gridSize = parseInt(this.value, 10);
+    gridVal.textContent = this.value;
     renderFrame();
   });
 
-  /* --- init --- */
-  loadData(50, function () {
+  /* ---- init ---- */
+  loadAll(function () {
     loadingEl.style.display = "none";
-    var n = state.data[50].meta.n_timesteps;
-    scrubEl.max = n - 1;
+    scrubEl.min = SKIP;
+    scrubEl.max = state.meta.n_timesteps - 1;
+    scrubEl.value = SKIP;
+    state.frame = SKIP;
     drawColorbar();
     renderFrame();
-    /* preload 100m in background */
-    loadData(100, function () {});
   });
 })();
 </script>
