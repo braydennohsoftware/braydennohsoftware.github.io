@@ -35,7 +35,7 @@ This simulator models terrace formation from subduction zone earthquake cycles. 
 
   <div style="display:grid; grid-template-columns:auto 1fr auto; gap:4px 10px; align-items:center; max-width:460px;">
     <label for="sl-interval">EQ cycle</label>
-    <input id="sl-interval" type="range" min="0" max="10010" step="10" value="100">
+    <input id="sl-interval" type="range" min="0" max="1010" step="10" value="100">
     <span id="val-interval">100 yr</span>
 
     <label for="sl-locked">Locking depth</label>
@@ -322,7 +322,7 @@ var simTime=0, eqCount=0, tSinceEq=0, eqFlash=0, playing=false, afId=null;
 function doStep(){
   var eq=getInterval(), K=getK(), M=getM(), N=getN_();
   if(eq===0){for(var i=1;i<NX;i++) topoZ[i]+=(upliftRed[i]+upliftBlue[i])*DT;}
-  else if(eq>10000){for(var i=1;i<NX;i++) topoZ[i]+=upliftRed[i]*DT;}
+  else if(eq>1000){for(var i=1;i<NX;i++) topoZ[i]+=upliftRed[i]*DT;}
   else{
     for(var i=1;i<NX;i++) topoZ[i]+=upliftRed[i]*DT;
     tSinceEq+=DT;
@@ -341,7 +341,7 @@ function updateInfo(){
   infoMaxZ.textContent=mx.toFixed(2);
   infoEq.textContent=eqCount;
   if(eq===0) infoNext.textContent="N/A";
-  else if(eq>10000) infoNext.textContent="Never";
+  else if(eq>1000) infoNext.textContent="Never";
   else infoNext.textContent=Math.max(0,eq-tSinceEq);
 }
 
@@ -363,7 +363,7 @@ btnPlay.addEventListener("click",play);
 btnPause.addEventListener("click",pause);
 btnReset.addEventListener("click",reset);
 
-function ilbl(v){if(v===0)return"Steady";if(v>10000)return"Never";return v+" yr";}
+function ilbl(v){if(v===0)return"Steady";if(v>1000)return"Never";return v+" yr";}
 slInterval.addEventListener("input",function(){valInterval.textContent=ilbl(parseInt(slInterval.value));updateInfo();});
 slLocked.addEventListener("input",function(){var d=parseInt(slLocked.value);valLocked.textContent=d+" km";loadProfile(d);reset();});
 slK.addEventListener("input",function(){var K=Math.pow(10,parseFloat(slK.value));valK.textContent=K>=0.01?K.toFixed(2):K>=0.001?K.toFixed(3):K.toExponential(1);});
