@@ -190,7 +190,7 @@ function tvdStep(z, dx, dtM, Ke, m, n, DA, cfl) {
     for (var i = 0; i < nx; i++) if (a[i] > am) am = a[i];
     var ds = dtM;
     if (am > 0) { var da = cfl*dx/am; if (da < ds) ds = da; }
-    var ns = Math.ceil(dtM/ds); ds = dtM/ns;
+    var ns = Math.ceil(dtM/ds); if (ns > 500) ns = 500; ds = dtM/ns;
     var zn = new Float64Array(nx), r = new Float64Array(nx), phi = new Float64Array(nx);
     for (var st = 0; st < ns; st++) {
         for (var i = 0; i < nx; i++) {
@@ -355,7 +355,11 @@ function updateInfo(){
 
 function animate(){
   if(!playing)return;
-  for(var s=0;s<STEPS_PER_FRAME;s++) doStep();
+  var t0=performance.now(), budget=14;
+  for(var s=0;s<STEPS_PER_FRAME;s++){
+    doStep();
+    if(performance.now()-t0>budget) break;
+  }
   var fl=eqFlash>0; if(eqFlash>0) eqFlash--;
   renderTopo(topoZ,rawZ); renderUplift(fl); renderFault(fl); updateInfo();
   afId=requestAnimationFrame(animate);
