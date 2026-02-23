@@ -36,7 +36,7 @@ where \(\mathcal{D}(\mathbf{x},t) = \min_{\mathbf{y}:\,R(\mathbf{y},t)=1} \|\mat
 </div>
 
 <div id="sim-info" style="font-family: monospace; font-size: 14px; margin-bottom: 0.5rem;">
-  Timestep: <span id="info-timestep">0</span> / 1000 &nbsp;&bull;&nbsp;
+  Timestep: <span id="info-timestep">0</span> / <span id="info-total">1001</span> &nbsp;&bull;&nbsp;
   Population: <span id="info-pop">0</span> &nbsp;&bull;&nbsp;
   Clusters: <span id="info-clusters">0</span>
 </div>
@@ -57,27 +57,27 @@ where \(\mathcal{D}(\mathbf{x},t) = \min_{\mathbf{y}:\,R(\mathbf{y},t)=1} \|\mat
 
   <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 4px 10px; align-items: center; max-width: 460px;">
     <label for="sl-wdist">\(w_d\)</label>
-    <input id="sl-wdist" type="range" min="0" max="10.0" step="0.1" value="1.0">
-    <span id="val-wdist">1.0</span>
+    <input id="sl-wdist" type="range" min="0" max="10" step="0.1" value="2.0">
+    <span id="val-wdist">2.0</span>
 
     <label for="sl-wcoh">\(w_c\)</label>
-    <input id="sl-wcoh" type="range" min="0" max="10.0" step="0.1" value="2.0">
-    <span id="val-wcoh">2.0</span>
+    <input id="sl-wcoh" type="range" min="0" max="10" step="0.1" value="4.0">
+    <span id="val-wcoh">4.0</span>
 
     <label for="sl-friction">\(\mu\)</label>
-    <input id="sl-friction" type="range" min="1" max="100" step="0.5" value="5">
+    <input id="sl-friction" type="range" min="0" max="100" step="0.5" value="5">
     <span id="val-friction">5</span>
 
     <label for="sl-pop">Population</label>
-    <input id="sl-pop" type="range" min="100" max="10000" step="100" value="1000">
+    <input id="sl-pop" type="range" min="100" max="5000" step="50" value="1000">
     <span id="val-pop">1000</span>
 
-    <label for="sl-crawl">Crawl speed</label>
-    <input id="sl-crawl" type="range" min="1" max="100" step="1" value="10">
-    <span id="val-crawl">10</span>
+    <label for="sl-crawl">Swaps/step</label>
+    <input id="sl-crawl" type="range" min="1" max="200" step="1" value="20">
+    <span id="val-crawl">20</span>
 
     <label for="sl-speed">Frame delay</label>
-    <input id="sl-speed" type="range" min="0" max="200" step="10" value="50">
+    <input id="sl-speed" type="range" min="0" max="500" step="10" value="50">
     <span id="val-speed">50 ms</span>
   </div>
 </div>
@@ -88,15 +88,15 @@ where \(\mathcal{D}(\mathbf{x},t) = \min_{\mathbf{y}:\,R(\mathbf{y},t)=1} \|\mat
 (function() {
 "use strict";
 
-// ── Grid constants ──
-const CELL_SIZE = 50;
+// ── Grid constants (matches sweep 2.22, coarsened for browser) ──
+const CELL_SIZE = 25;
 const XMIN = 1000, XMAX = 9000;
 const YMIN = -2000, YMAX = 2000;
-const COLS = Math.round((XMAX - XMIN) / CELL_SIZE);
-const ROWS = Math.round((YMAX - YMIN) / CELL_SIZE);
+const COLS = Math.round((XMAX - XMIN) / CELL_SIZE);  // 320
+const ROWS = Math.round((YMAX - YMIN) / CELL_SIZE);  // 160
 const N = ROWS * COLS;
+const RIVER_RADIUS = (50.0 / 2.0) / CELL_SIZE;  // W=100 -> radius=50/2=25 -> 1 cell
 
-// 8-connected neighbor offsets
 const OFFSETS_DR = [-1,-1,-1, 0, 0, 1, 1, 1];
 const OFFSETS_DC = [-1, 0, 1,-1, 1,-1, 0, 1];
 
@@ -108,17 +108,17 @@ let currentStep = 0;
 let animFrameId = null;
 let lastFrameTime = 0;
 
-// ── DOM refs ──
+// ── DOM ──
 const canvas = document.getElementById("sim-canvas");
 const ctx = canvas.getContext("2d");
 canvas.width = COLS;
 canvas.height = ROWS;
 
 const infoStep = document.getElementById("info-timestep");
+const infoTotal = document.getElementById("info-total");
 const infoPop = document.getElementById("info-pop");
 const infoClusters = document.getElementById("info-clusters");
 const loadingMsg = document.getElementById("loading-msg");
-
 const btnPlay = document.getElementById("btn-play");
 const btnPause = document.getElementById("btn-pause");
 const btnReset = document.getElementById("btn-reset");
@@ -131,9 +131,7 @@ const sliders = {
   crawl:    { el: document.getElementById("sl-crawl"),    valEl: document.getElementById("val-crawl"),    fmt: v => v },
   speed:    { el: document.getElementById("sl-speed"),    valEl: document.getElementById("val-speed"),    fmt: v => v + " ms" },
 };
-
 function getParam(name) { return parseFloat(sliders[name].el.value); }
-
 for (const key of Object.keys(sliders)) {
   const s = sliders[key];
   s.el.addEventListener("input", () => { s.valEl.textContent = s.fmt(s.el.value); });
@@ -146,32 +144,41 @@ async function loadRiverData() {
   const resp = await fetch("assets/river_data.json");
   const data = await resp.json();
   riverTimesteps = data.timesteps;
+  infoTotal.textContent = riverTimesteps.length - 1;
   loadingMsg.style.display = "none";
 }
 
 // ══════════════════════════════════════════
-// 2. Rasterize channel (Bresenham)
+// 2. Rasterize channel with river width
 // ══════════════════════════════════════════
 function rasterizeChannel(flatCoords) {
-  const grid = new Uint8Array(N);
+  // First draw centerline via Bresenham
+  const centerline = new Uint8Array(N);
   const nPts = flatCoords.length / 2;
   for (let i = 0; i < nPts - 1; i++) {
-    let x0 = flatCoords[i * 2], y0 = flatCoords[i * 2 + 1];
-    let x1 = flatCoords[(i + 1) * 2], y1 = flatCoords[(i + 1) * 2 + 1];
+    const x0 = flatCoords[i * 2], y0 = flatCoords[i * 2 + 1];
+    const x1 = flatCoords[(i + 1) * 2], y1 = flatCoords[(i + 1) * 2 + 1];
     let c0 = Math.round((x0 - XMIN) / CELL_SIZE);
     let r0 = Math.round((y0 - YMIN) / CELL_SIZE);
-    let c1 = Math.round((x1 - XMIN) / CELL_SIZE);
-    let r1 = Math.round((y1 - YMIN) / CELL_SIZE);
-    let dc = Math.abs(c1 - c0), dr = Math.abs(r1 - r0);
-    let sc = c0 < c1 ? 1 : -1, sr = r0 < r1 ? 1 : -1;
+    const c1 = Math.round((x1 - XMIN) / CELL_SIZE);
+    const r1 = Math.round((y1 - YMIN) / CELL_SIZE);
+    const dc = Math.abs(c1 - c0), dr = Math.abs(r1 - r0);
+    const sc = c0 < c1 ? 1 : -1, sr = r0 < r1 ? 1 : -1;
     let err = dc - dr;
     while (true) {
-      if (r0 >= 0 && r0 < ROWS && c0 >= 0 && c0 < COLS) grid[r0 * COLS + c0] = 1;
+      if (r0 >= 0 && r0 < ROWS && c0 >= 0 && c0 < COLS) centerline[r0 * COLS + c0] = 1;
       if (r0 === r1 && c0 === c1) break;
-      let e2 = 2 * err;
+      const e2 = 2 * err;
       if (e2 > -dr) { err -= dr; c0 += sc; }
       if (e2 <  dc) { err += dc; r0 += sr; }
     }
+  }
+
+  // Dilate by river radius using distance transform
+  const d = distanceTransform(centerline);
+  const grid = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    if (d[i] <= RIVER_RADIUS) grid[i] = 1;
   }
   return grid;
 }
@@ -179,12 +186,13 @@ function rasterizeChannel(flatCoords) {
 // ══════════════════════════════════════════
 // 3. Distance Transform (Felzenszwalb 2D EDT)
 // ══════════════════════════════════════════
-function distanceTransform(riverGrid) {
+function distanceTransform(binaryGrid) {
   const INF = 1e10;
   const f = new Float32Array(N);
   const d = new Float32Array(N);
-  for (let i = 0; i < N; i++) f[i] = riverGrid[i] ? 0 : INF;
+  for (let i = 0; i < N; i++) f[i] = binaryGrid[i] ? 0 : INF;
 
+  // Pass 1: columns
   const colBuf = new Float32Array(ROWS);
   for (let c = 0; c < COLS; c++) {
     colBuf[0] = f[0 * COLS + c];
@@ -193,6 +201,7 @@ function distanceTransform(riverGrid) {
     for (let r = 0; r < ROWS; r++) f[r * COLS + c] = colBuf[r] * colBuf[r];
   }
 
+  // Pass 2: rows (parabola envelope)
   const v = new Int32Array(COLS);
   const z = new Float32Array(COLS + 1);
   const rowD = new Float32Array(COLS);
@@ -207,7 +216,7 @@ function distanceTransform(riverGrid) {
     k = 0;
     for (let q = 0; q < COLS; q++) {
       while (z[k + 1] < q) k++;
-      let dq = q - v[k]; rowD[q] = dq * dq + f[off + v[k]];
+      const dq = q - v[k]; rowD[q] = dq * dq + f[off + v[k]];
     }
     for (let q = 0; q < COLS; q++) d[off + q] = Math.sqrt(rowD[q]);
   }
@@ -260,10 +269,17 @@ function getWorstVillage(baseU, wCoh) {
 function caStep(baseU, wCoh, friction, crawlSpeed) {
   const drowned = [];
   for (let i = 0; i < N; i++) { if (village[i] && river[i]) drowned.push(i); }
-  for (const idx of drowned) { const r = (idx / COLS) | 0, c = idx % COLS; village[idx] = 0; updateNeighbors(r, c, -1); }
+  for (const idx of drowned) {
+    const r = (idx / COLS) | 0, c = idx % COLS;
+    village[idx] = 0; updateNeighbors(r, c, -1);
+  }
   for (let d = 0; d < drowned.length; d++) {
     const best = getBestPerimeter(baseU, wCoh);
-    if (best.idx >= 0) { village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); }
+    if (best.idx >= 0) {
+      village[best.idx] = 1;
+      const r = (best.idx / COLS) | 0, c = best.idx % COLS;
+      updateNeighbors(r, c, 1);
+    }
   }
   for (let s = 0; s < crawlSpeed; s++) {
     const worst = getWorstVillage(baseU, wCoh);
@@ -271,23 +287,31 @@ function caStep(baseU, wCoh, friction, crawlSpeed) {
     const best = getBestPerimeter(baseU, wCoh);
     if (best.idx < 0) break;
     if (best.score > worst.score + friction) {
-      const wr = (worst.idx / COLS) | 0, wc = worst.idx % COLS; village[worst.idx] = 0; updateNeighbors(wr, wc, -1);
-      village[best.idx] = 1; const br = (best.idx / COLS) | 0, bc = best.idx % COLS; updateNeighbors(br, bc, 1);
+      const wr = (worst.idx / COLS) | 0, wc2 = worst.idx % COLS;
+      village[worst.idx] = 0; updateNeighbors(wr, wc2, -1);
+      village[best.idx] = 1;
+      const br = (best.idx / COLS) | 0, bc = best.idx % COLS;
+      updateNeighbors(br, bc, 1);
     } else break;
   }
 }
 
 function countClusters() {
   const visited = new Uint8Array(N);
-  let count = 0; const queue = [];
+  let count = 0;
+  const queue = [];
   for (let i = 0; i < N; i++) {
     if (!village[i] || visited[i]) continue;
     count++; queue.length = 0; queue.push(i); visited[i] = 1;
     while (queue.length > 0) {
-      const idx = queue.pop(); const r = (idx / COLS) | 0, c = idx % COLS;
+      const idx = queue.pop();
+      const r = (idx / COLS) | 0, c = idx % COLS;
       for (let d = 0; d < 8; d++) {
         const rr = r + OFFSETS_DR[d], cc = c + OFFSETS_DC[d];
-        if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) { const ni = rr * COLS + cc; if (village[ni] && !visited[ni]) { visited[ni] = 1; queue.push(ni); } }
+        if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
+          const ni = rr * COLS + cc;
+          if (village[ni] && !visited[ni]) { visited[ni] = 1; queue.push(ni); }
+        }
       }
     }
   }
@@ -300,11 +324,14 @@ function countClusters() {
 function initVillage() {
   const wDist = getParam("wdist"), wCoh = getParam("wcoh"), friction = getParam("friction"), pop = getParam("pop");
   currentStep = 0;
+
   river = rasterizeChannel(riverTimesteps[0]);
   dist = distanceTransform(river);
   const baseU = computeBaseU(dist, river, wDist);
-  village = new Uint8Array(N); neighbors = new Int16Array(N);
+  village = new Uint8Array(N);
+  neighbors = new Int16Array(N);
 
+  // Seed near center
   let bestStartScore = -Infinity, bestStartIdx = 0;
   const centerR = ROWS / 2, centerC = COLS / 2;
   for (let i = 0; i < N; i++) {
@@ -318,11 +345,19 @@ function initVillage() {
   const sr = (bestStartIdx / COLS) | 0, sc = bestStartIdx % COLS;
   updateNeighbors(sr, sc, 1);
 
+  // Grow to target population
   for (let g = 1; g < pop; g++) {
     const best = getBestPerimeter(baseU, wCoh);
-    if (best.idx >= 0) { village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); }
+    if (best.idx >= 0) {
+      village[best.idx] = 1;
+      const r = (best.idx / COLS) | 0, c = best.idx % COLS;
+      updateNeighbors(r, c, 1);
+    }
   }
-  for (let b = 0; b < 150; b++) caStep(baseU, wCoh, friction, 10);
+
+  // Settle
+  for (let b = 0; b < 100; b++) caStep(baseU, wCoh, friction, 20);
+
   prevVillage = new Uint8Array(village);
   render(); updateInfo();
 }
@@ -335,15 +370,18 @@ const imgData = ctx.createImageData(COLS, ROWS);
 function render() {
   const pixels = imgData.data;
   for (let i = 0; i < N; i++) {
-    const off = i * 4, wasV = prevVillage[i], nowV = village[i], nowR = river[i];
+    const off = i * 4;
+    const wasV = prevVillage[i], nowV = village[i], nowR = river[i];
     if (wasV && nowR)                { pixels[off]=255; pixels[off+1]=26;  pixels[off+2]=26;  pixels[off+3]=255; }
     else if (wasV && nowV)           { pixels[off]=255; pixels[off+1]=128; pixels[off+2]=0;   pixels[off+3]=255; }
     else if (!wasV && nowV)          { pixels[off]=26;  pixels[off+1]=255; pixels[off+2]=26;  pixels[off+3]=255; }
     else if (wasV && !nowV && !nowR) { pixels[off]=255; pixels[off+1]=255; pixels[off+2]=255; pixels[off+3]=255; }
-    else if (nowR)                   { pixels[off]=0;   pixels[off+1]=0;   pixels[off+2]=255; pixels[off+3]=255; }
+    else if (nowR)                   { pixels[off]=0;   pixels[off+1]=40;  pixels[off+2]=255; pixels[off+3]=255; }
     else                             { pixels[off]=0;   pixels[off+1]=0;   pixels[off+2]=0;   pixels[off+3]=255; }
   }
-  const flipped = ctx.createImageData(COLS, ROWS); const fp = flipped.data;
+  // Flip vertically
+  const flipped = ctx.createImageData(COLS, ROWS);
+  const fp = flipped.data;
   for (let r = 0; r < ROWS; r++) {
     const srcOff = r * COLS * 4, dstOff = (ROWS - 1 - r) * COLS * 4;
     for (let c = 0; c < COLS * 4; c++) fp[dstOff + c] = pixels[srcOff + c];
@@ -367,9 +405,12 @@ function updateInfo() {
     else if (!wasV && nowV)         nNew++;
     else if (wasV && !nowV && !nowR) nAbandoned++;
   }
-  infoPop.textContent = pop; infoClusters.textContent = countClusters();
-  infoStable.textContent = nStable; infoNew.textContent = nNew;
-  infoAbandoned.textContent = nAbandoned; infoDrowned.textContent = nDrowned;
+  infoPop.textContent = pop;
+  infoClusters.textContent = countClusters();
+  infoStable.textContent = nStable;
+  infoNew.textContent = nNew;
+  infoAbandoned.textContent = nAbandoned;
+  infoDrowned.textContent = nDrowned;
 }
 
 // ══════════════════════════════════════════
@@ -411,8 +452,16 @@ sliders.pop.el.addEventListener("change", () => {
   const targetPop = getParam("pop"), wDist = getParam("wdist"), wCoh = getParam("wcoh");
   const baseU = computeBaseU(dist, river, wDist);
   let currentPop = 0; for (let i = 0; i < N; i++) if (village[i]) currentPop++;
-  while (currentPop < targetPop) { const best = getBestPerimeter(baseU, wCoh); if (best.idx < 0) break; village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); currentPop++; }
-  while (currentPop > targetPop) { const worst = getWorstVillage(baseU, wCoh); if (worst.idx < 0) break; village[worst.idx] = 0; const wr = (worst.idx / COLS) | 0, wc = worst.idx % COLS; updateNeighbors(wr, wc, -1); currentPop--; }
+  while (currentPop < targetPop) {
+    const best = getBestPerimeter(baseU, wCoh);
+    if (best.idx < 0) break;
+    village[best.idx] = 1; const r = (best.idx / COLS) | 0, c = best.idx % COLS; updateNeighbors(r, c, 1); currentPop++;
+  }
+  while (currentPop > targetPop) {
+    const worst = getWorstVillage(baseU, wCoh);
+    if (worst.idx < 0) break;
+    village[worst.idx] = 0; const wr = (worst.idx / COLS) | 0, wc2 = worst.idx % COLS; updateNeighbors(wr, wc2, -1); currentPop--;
+  }
   render(); updateInfo();
 });
 
