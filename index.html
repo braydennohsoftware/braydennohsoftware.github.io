@@ -5,64 +5,101 @@
 <title>Brayden Noh</title>
 <style>
 body {
-  background: #000;
-  color: #0f0;
+  background: #300a24;
+  color: #fff;
   font-family: "Courier New", Courier, monospace;
   font-size: 14px;
-  margin: 20px;
-  line-height: 1.6;
+  margin: 0;
+  padding: 20px;
+  line-height: 1.5;
 }
-a { color: #0ff; }
-a:visited { color: #fff; }
-a:hover { color: #ff0; }
-hr { border: 0; border-top: 1px solid #0f0; }
 pre { margin: 0; }
+a { color: #0ff; text-decoration: none; }
+a:visited { color: #0ff; }
+
+.header {
+  color: #0f0;
+  margin-bottom: 4px;
+}
+.meters span.bar { color: #0f0; }
+.meters span.label { color: #0f0; font-weight: bold; }
+.meters span.val { color: #fff; }
+
+.col-header {
+  background: #0f0;
+  color: #000;
+  display: block;
+  padding: 0 2px;
+  font-weight: bold;
+}
+
+.row {
+  display: block;
+  padding: 0 2px;
+  cursor: pointer;
+}
+.row:hover {
+  background: #0a0;
+  color: #000;
+}
+.row:hover a { color: #000; }
+.row:hover .desc { color: #000; }
+
+.desc { color: #aaa; }
+.date { color: #0f0; }
+.pid { color: #fff; }
+
+.selected {
+  background: #0a0;
+  color: #000;
+}
+.selected a { color: #000; }
+.selected .desc { color: #000; }
+
+.footer {
+  background: #0ff;
+  color: #000;
+  display: block;
+  padding: 0 2px;
+  margin-top: 8px;
+  font-weight: bold;
+}
+.footer span { margin-right: 12px; }
+.fkey { background: #000; color: #fff; padding: 0 2px; }
 </style>
 </head>
 <body>
 <pre>
-========================================
-  Brayden Noh - Projects
-========================================
+<span class="header">brayden@projects:~$ htop</span>
 
-This is where Brayden stores his projects.
+<span class="meters"><span class="label">Projects[</span><span class="bar">|||||||||||||||||||||||||||||</span><span class="label">]</span> <span class="val">5 loaded</span></span>
+<span class="meters"><span class="label">Uptime:</span> <span class="val">2025-present</span></span>
 
-----------------------------------------
-  INDEX
-----------------------------------------
+<span class="col-header">  DATE      PID  STATUS   PROJECT                              </span>
 
-  DATE        PROJECT
-  ----        -------
-
-  2025-06    <a href="chaos-river">Meander Cutoffs Induce Chaos</a>
-              Cutoffs as a sufficient condition for
-              deterministic chaos in kinematic river
-              channel evolution.
-
-  2025-05    <a href="terrace-subduction-uplift">Terrace Subduction Uplift</a>
-              A subduction zone earthquake cycle simulator:
-              a curved fault accumulates slip deficit and
-              releases it as coseismic uplift, forming
-              terraces through stream-power erosion.
-
-  2025-04    <a href="earthquakes-to-topography">Earthquakes to Topography</a>
-              An interactive simulator of earthquake cycles:
-              a listric reverse fault accumulates slip
-              deficit and releases it as coseismic uplift,
-              shaping topography via stream-power erosion.
-
-  2025-03    <a href="fault-river-profile">Fault to River Profile</a>
-              An interactive simulator exploring how
-              faulting shapes river longitudinal profiles.
-
-  2025-02    <a href="human-river">Human-River Geomorphic Coupling</a>
-              A coupled human-geomorphic model exploring
-              how settlements evolve around migrating
-              rivers.
-
-----------------------------------------
-  EOF
-----------------------------------------
+<span class="row">  <span class="date">2025-06</span>   <span class="pid">001</span>  active   <a href="chaos-river">Meander Cutoffs Induce Chaos</a>
+                           <span class="desc">Cutoffs as a sufficient condition for deterministic</span>
+                           <span class="desc">chaos in kinematic river channel evolution.</span>
+</span>
+<span class="row">  <span class="date">2025-05</span>   <span class="pid">002</span>  active   <a href="terrace-subduction-uplift">Terrace Subduction Uplift</a>
+                           <span class="desc">A subduction zone earthquake cycle simulator: a curved</span>
+                           <span class="desc">fault accumulates slip deficit and releases it as</span>
+                           <span class="desc">coseismic uplift, forming terraces via stream-power.</span>
+</span>
+<span class="row">  <span class="date">2025-04</span>   <span class="pid">003</span>  active   <a href="earthquakes-to-topography">Earthquakes to Topography</a>
+                           <span class="desc">An interactive simulator of earthquake cycles: a listric</span>
+                           <span class="desc">reverse fault accumulates slip deficit and releases it</span>
+                           <span class="desc">as coseismic uplift, shaping topography via erosion.</span>
+</span>
+<span class="row">  <span class="date">2025-03</span>   <span class="pid">004</span>  active   <a href="fault-river-profile">Fault to River Profile</a>
+                           <span class="desc">An interactive simulator exploring how faulting shapes</span>
+                           <span class="desc">river longitudinal profiles.</span>
+</span>
+<span class="row">  <span class="date">2025-02</span>   <span class="pid">005</span>  active   <a href="human-river">Human-River Geomorphic Coupling</a>
+                           <span class="desc">A coupled human-geomorphic model exploring how</span>
+                           <span class="desc">settlements evolve around migrating rivers.</span>
+</span>
+<span class="footer"><span class="fkey">F1</span>Help <span class="fkey">F2</span>About <span class="fkey">F3</span>Search <span class="fkey">F5</span>GitHub <span class="fkey">F10</span>Quit</span>
 </pre>
 </body>
 </html>
