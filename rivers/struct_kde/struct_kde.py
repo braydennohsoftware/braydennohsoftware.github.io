@@ -1,0 +1,325 @@
+import numpy as np
+
+
+# ---------------------------------------------------------------------------
+# Fault geometry utilities
+# ---------------------------------------------------------------------------
+
+def _quintic_patch_coeffs(xL, zL, mL, xR, zR, mR):
+    h = xR - xL
+    if h <= 0:
+        raise ValueError("xR must be > xL")
+    a0 = zL
+    a1 = mL * h
+    a2 = 0.0
+    D0 = zR - zL - a1
+    D1 = (mR - mL) * h
+    A = np.array([[1,  1,  1],
+                  [3,  4,  5],
+                  [6, 12, 20]], dtype=float)
+    a3, a4, a5 = np.linalg.solve(A, np.array([D0, D1, 0.0], dtype=float))
+    return np.array([a0, a1, a2, a3, a4, a5], dtype=float), h
+
+
+def _eval_quintic(x, xL, coeffs, h):
+    t = (x - xL) / h
+    a0, a1, a2, a3, a4, a5 = coeffs
+    return (((((a5*t + a4)*t + a3)*t + a2)*t + a1)*t + a0)
+
+
+def build_c2_fault_model(x, z, w=5.0):
+    x = np.asarray(x, float)
+    z = np.asarray(z, float)
+    if np.any(np.diff(x) <= 0):
+        raise ValueError("x must be strictly increasing")
+    n = len(x)
+    if n < 2:
+        raise ValueError("Need at least 2 points")
+    m_seg = np.diff(z) / np.diff(x)
+    wv = np.zeros(n)
+    for i in range(1, n - 1):
+        wi = float(w)
+        wi = min(wi, 0.45 * (x[i] - x[i - 1]), 0.45 * (x[i + 1] - x[i]))
+        wv[i] = wi
+    patches = {}
+    for i in range(1, n - 1):
+        wi = wv[i]
+        if wi <= 0:
+            continue
+        xL = x[i] - wi
+        xR = x[i] + wi
+        mL = m_seg[i - 1]
+        mR = m_seg[i]
+        zL = z[i] + mL * (xL - x[i])
+        zR = z[i] + mR * (xR - x[i])
+        coeffs, h = _quintic_patch_coeffs(xL, zL, mL, xR, zR, mR)
+        patches[i] = (xL, coeffs, h)
+    pieces = []
+    for seg in range(n - 1):
+        left_cut = wv[seg] if seg > 0 else 0.0
+        right_cut = wv[seg + 1] if (seg + 1) < n - 1 else 0.0
+        xL = x[seg] + left_cut
+        xR = x[seg + 1] - right_cut
+        if xR > xL:
+            pieces.append(("line", xL, xR, seg))
+        v = seg + 1
+        if 1 <= v <= n - 2 and wv[v] > 0:
+            pieces.append(("patch", x[v] - wv[v], x[v] + wv[v], v))
+    return dict(x=x, z=z, m_seg=m_seg, pieces=pieces, patches=patches)
+
+
+def eval_c2_fault(xq, model, extrapolate=True):
+    x = model["x"]
+    z = model["z"]
+    m_seg = model["m_seg"]
+    pieces = model["pieces"]
+    patches = model["patches"]
+    xq = np.asarray(xq, float)
+    zq = np.full_like(xq, np.nan, dtype=float)
+    for kind, xL, xR, idx in pieces:
+        mask = (xq >= xL) & (xq <= xR)
+        if not np.any(mask):
+            continue
+        if kind == "line":
+            seg = idx
+            zq[mask] = z[seg] + m_seg[seg] * (xq[mask] - x[seg])
+        else:
+            v = idx
+            xL0, coeffs, h = patches[v]
+            zq[mask] = _eval_quintic(xq[mask], xL0, coeffs, h)
+    if extrapolate:
+        m0 = m_seg[0]
+        mn = m_seg[-1]
+        zq = np.where(np.isnan(zq) & (xq < x[0]), z[0] + m0 * (xq - x[0]), zq)
+        zq = np.where(np.isnan(zq) & (xq > x[-1]), z[-1] + mn * (xq - x[-1]), zq)
+    return zq
+
+
+def resample_equal_arclength(x_dense, z_dense, n_points):
+    x_dense = np.asarray(x_dense, float)
+    z_dense = np.asarray(z_dense, float)
+    ds = np.sqrt(np.diff(x_dense) ** 2 + np.diff(z_dense) ** 2)
+    s = np.concatenate(([0.0], np.cumsum(ds)))
+    L = s[-1]
+    s_uniform = np.linspace(0.0, L, n_points)
+    x_new = np.interp(s_uniform, s, x_dense)
+    z_new = np.interp(s_uniform, s, z_dense)
+    return x_new, z_new, s_uniform, L
+
+
+def segment_angles(xnode, znode):
+    xnode = np.asarray(xnode, dtype=float)
+    znode = np.asarray(znode, dtype=float)
+    dx = np.diff(xnode)
+    dz = np.diff(znode)
+    theta = np.arctan2(dz, dx)
+    return theta, dx, dz
+
+
+def compute_axial_surface_intersections(xnode, znode, theta, atol=1e-12):
+    xnode = np.asarray(xnode, dtype=float)
+    znode = np.asarray(znode, dtype=float)
+    theta = np.asarray(theta, dtype=float)
+    nseg = theta.size
+    x_axial = np.empty(nseg - 1, dtype=float)
+    gamma = np.empty(nseg - 1, dtype=float)
+    for j in range(1, nseg):
+        th1 = theta[j - 1]
+        th2 = theta[j]
+        g = 0.5 * (th1 + th2 + np.pi)
+        gamma[j - 1] = g
+        xk, zk = xnode[j], znode[j]
+        tg = np.tan(g)
+        if np.isclose(tg, 0.0, atol=atol):
+            x_axial[j - 1] = np.nan
+        else:
+            x_axial[j - 1] = xk - zk / tg
+    x_bounds = x_axial[np.isfinite(x_axial)]
+    bad = np.where(np.diff(x_bounds) <= 0)[0]
+    if bad.size:
+        i = bad[0]
+        raise ValueError(
+            f"x_axial is not strictly increasing at i={i}: "
+            f"{x_bounds[i]} -> {x_bounds[i+1]}"
+        )
+    return x_axial, gamma
+
+
+# ---------------------------------------------------------------------------
+# Structural (kinematic) velocity
+# ---------------------------------------------------------------------------
+
+def structural_velocity(x_obs, theta, x_axial, slip_by_segment, x_start):
+    x_obs = np.asarray(x_obs, dtype=float)
+    theta = np.asarray(theta, dtype=float)
+    slip_by_segment = np.asarray(slip_by_segment, dtype=float)
+    x_axial = np.asarray(x_axial, dtype=float)
+    x_bounds = x_axial[np.isfinite(x_axial)]
+    dom = np.searchsorted(x_bounds, x_obs, side="right")
+    dom = np.clip(dom, 0, theta.size - 1)
+    u = slip_by_segment[dom] * np.cos(theta[dom])
+    v = -slip_by_segment[dom] * np.sin(theta[dom])
+    mask = x_obs < x_start
+    u = u.astype(float, copy=True)
+    v = v.astype(float, copy=True)
+    u[mask] = 0.0
+    v[mask] = 0.0
+    return u, v, dom
+
+
+# ---------------------------------------------------------------------------
+# Half-space 2D dip-slip edge dislocation
+#
+# Segall (2010) eq. 3.70 gives the FULL-SPACE surface displacement for a
+# dipping edge dislocation.  In 2D plane strain the free-surface image
+# exactly doubles the displacement at z = 0 (the biharmonic correction
+# vanishes on the free surface), so we include the factor of 2 to obtain
+# the HALF-SPACE result required by the Equivalence Theorem.
+# ---------------------------------------------------------------------------
+
+def u2_edge(x_obs, slip, delta, d, x_ref, orient):
+    if d <= 0:
+        eps = 1e-12
+        return -(2 * slip / np.pi) * np.sin(delta) * np.arctan2(
+            orient * (x_obs - x_ref), eps
+        )
+    zeta = orient * (x_obs - x_ref) / d
+    return -(2 * slip / np.pi) * (
+        np.sin(delta) * np.arctan(zeta)
+        + (np.cos(delta) + zeta * np.sin(delta)) / (1.0 + zeta**2)
+    )
+
+
+def u1_edge(x_obs, slip, delta, d, x_ref, orient):
+    if d <= 0:
+        eps = 1e-12
+        return (2 * slip / np.pi) * np.cos(delta) * np.arctan2(
+            orient * (x_obs - x_ref), eps
+        )
+    zeta = orient * (x_obs - x_ref) / d
+    return (2 * slip / np.pi) * (
+        np.cos(delta) * np.arctan(zeta)
+        + (np.sin(delta) - zeta * np.cos(delta)) / (1.0 + zeta**2)
+    )
+
+
+def u2_segment(x_obs, x1, z1, x2, z2, slip_mag, slip_sign=-1.0):
+    d1, d2 = -z1, -z2
+    dx, dd = x2 - x1, d2 - d1
+    delta = np.arctan2(abs(dd), max(abs(dx), 1e-12))
+    orient = np.sign(dx) if abs(dx) > 0 else 1.0
+    if d1 <= d2:
+        x_top, d_top, x_bot, d_bot = x1, d1, x2, d2
+    else:
+        x_top, d_top, x_bot, d_bot = x2, d2, x1, d1
+    s_top = slip_sign * slip_mag
+    s_bot = -s_top
+    return (u2_edge(x_obs, s_top, delta, d_top, x_top, orient) +
+            u2_edge(x_obs, s_bot, delta, d_bot, x_bot, orient))
+
+
+def u1_segment(x_obs, x1, z1, x2, z2, slip_mag, slip_sign=-1.0):
+    d1, d2 = -z1, -z2
+    dx, dd = x2 - x1, d2 - d1
+    delta = np.arctan2(abs(dd), max(abs(dx), 1e-12))
+    orient = np.sign(dx) if abs(dx) > 0 else 1.0
+    if d1 <= d2:
+        x_top, d_top, x_bot, d_bot = x1, d1, x2, d2
+    else:
+        x_top, d_top, x_bot, d_bot = x2, d2, x1, d1
+    s_top = slip_sign * slip_mag
+    s_bot = -s_top
+    return (u1_edge(x_obs, s_top, delta, d_top, x_top, orient) +
+            u1_edge(x_obs, s_bot, delta, d_bot, x_bot, orient))
+
+
+# ---------------------------------------------------------------------------
+# Dislocation network assembly
+# ---------------------------------------------------------------------------
+
+def build_dislocation_network(
+    xnode,
+    znode,
+    x_axial,
+    theta,
+    slip_fault,
+    include_folds=True,
+    sign_fault_u1=+1.0,
+    sign_fault_u2=-1.0,
+    sign_fold_u1=+1.0,
+    sign_fold_u2=-1.0,
+):
+    xnode = np.asarray(xnode, dtype=float)
+    znode = np.asarray(znode, dtype=float)
+    theta = np.asarray(theta, dtype=float)
+    x_axial = np.asarray(x_axial, dtype=float)
+    nseg = theta.size
+
+    if np.isscalar(slip_fault):
+        slip_fault = np.full(nseg, float(slip_fault))
+    else:
+        slip_fault = np.asarray(slip_fault, dtype=float)
+        if slip_fault.size != nseg:
+            raise ValueError("slip_fault must have length nseg")
+
+    segments = []
+
+    for i in range(nseg):
+        segments.append(dict(
+            name=f"Fault_{i+1}",
+            kind="fault",
+            x1=xnode[i],
+            z1=znode[i],
+            x2=xnode[i + 1],
+            z2=znode[i + 1],
+            slip=slip_fault[i],
+            sign_u1=float(sign_fault_u1),
+            sign_u2=float(sign_fault_u2),
+        ))
+
+    if include_folds and nseg >= 2:
+        for j in range(1, nseg):
+            xa = x_axial[j - 1]
+            if not np.isfinite(xa):
+                continue
+
+            dtheta = theta[j] - theta[j - 1]
+            slip_local = 0.5 * (slip_fault[j - 1] + slip_fault[j])
+            slip_fold = 2 * slip_local * np.sin(0.5 * dtheta)
+
+            segments.append(dict(
+                name=f"Axial_{j}",
+                kind="fold",
+                x1=xa,
+                z1=0.0,
+                x2=xnode[j],
+                z2=znode[j],
+                slip=slip_fold,
+                sign_u1=float(sign_fold_u1),
+                sign_u2=float(sign_fold_u2),
+            ))
+
+    return segments
+
+
+def elastic_velocity_from_segments(x_obs, segments):
+    u1_list = []
+    u2_list = []
+    for seg in segments:
+        u1_list.append(
+            u1_segment(
+                x_obs, seg["x1"], seg["z1"],
+                seg["x2"], seg["z2"], seg["slip"], seg["sign_u1"],
+            )
+        )
+        u2_list.append(
+            u2_segment(
+                x_obs, seg["x1"], seg["z1"],
+                seg["x2"], seg["z2"], seg["slip"], seg["sign_u2"],
+            )
+        )
+    U1_total = (np.sum(np.vstack(u1_list), axis=0)
+                if u1_list else np.zeros_like(x_obs))
+    U2_total = (np.sum(np.vstack(u2_list), axis=0)
+                if u2_list else np.zeros_like(x_obs))
+    return U1_total, U2_total, u1_list, u2_list
