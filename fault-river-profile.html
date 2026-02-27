@@ -1,11 +1,15 @@
----
-layout: default
-title:  Fault to River Profile
----
-
-<p>
-<a href="index.html">Brayden Noh</a>
-</p>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Fault to River Profile - Brayden Noh</title>
+<script>
+MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+<p><a href="index.html">&lt; back</a></p>
 
 <h1>Fault to River Profile</h1>
 
@@ -19,48 +23,20 @@ with drainage area from Hack's law \( A = (L - x)^h \).
 </p>
 
 <style>
-  .pnl-lbl {
-    font: 11px/1 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    letter-spacing: 0.03em;
-    color: #2171b5;
-    margin: 12px 0 4px 0;
-    font-weight: 500;
-  }
-  .pnl-lbl:first-child { margin-top: 0; }
-  #sim-container canvas {
-    width: 100%; display: block;
-  }
-  #sim-info {
-    font: 11px/1.4 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #6baed6;
-  }
-  #sim-controls button {
-    background: #fff; color: #2171b5;
-    border: 1px solid #c6dbef; border-radius: 4px;
-    padding: 5px 14px;
-    font: 12px/1 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    cursor: pointer; transition: background 0.15s, border-color 0.15s;
-  }
-  #sim-controls button:hover:not(:disabled) { background: #eff3ff; border-color: #6baed6; }
-  #sim-controls button:disabled { opacity: 0.35; cursor: default; }
-  #sim-controls label {
-    font: 13px/1 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #2171b5;
-  }
-  #sim-controls span {
-    font: 12px/1 -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #6baed6;
-  }
-  #sim-controls input[type="range"] {
-    -webkit-appearance: none; appearance: none;
-    height: 3px; background: #c6dbef; border-radius: 2px; outline: none;
-  }
-  #sim-controls input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 13px; height: 13px; border-radius: 50%;
-    background: #2171b5; cursor: pointer;
-    border: 2px solid #fff; box-shadow: 0 0 0 1px #c6dbef;
-  }
+body { background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 14px; margin: 20px; line-height: 1.6; }
+a { color: #0ff; } a:visited { color: #fff; } a:hover { color: #ff0; }
+h1 { color: #0f0; }
+.pnl-lbl { font: 11px/1 "Courier New", Courier, monospace; color: #0f0; margin: 12px 0 4px 0; font-weight: 500; }
+.pnl-lbl:first-child { margin-top: 0; }
+#sim-container canvas { width: 100%; display: block; }
+#sim-info { font: 11px/1.4 "Courier New", Courier, monospace; color: #0f0; }
+#sim-controls button { background: #000; color: #0f0; border: 1px solid #0f0; border-radius: 0; padding: 5px 14px; font: 12px/1 "Courier New", Courier, monospace; cursor: pointer; }
+#sim-controls button:hover:not(:disabled) { background: #0f0; color: #000; }
+#sim-controls button:disabled { opacity: 0.35; cursor: default; }
+#sim-controls label { font: 13px/1 "Courier New", Courier, monospace; color: #0f0; }
+#sim-controls span { font: 12px/1 "Courier New", Courier, monospace; color: #0f0; }
+#sim-controls input[type="range"] { -webkit-appearance: none; appearance: none; height: 3px; background: #0f0; border-radius: 0; outline: none; }
+#sim-controls input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #0f0; cursor: pointer; border: 2px solid #000; }
 </style>
 
 <div id="sim-container" style="margin: 1.5rem 0;">
@@ -202,7 +178,7 @@ function makePlotTransform(cw, ch, xMin, xMax, yMin, yMax) {
 function drawPlot(ctx, cw, ch, opts) {
   var t = opts.transform;
 
-  ctx.fillStyle = "#fff";
+  ctx.fillStyle = "#000";
   ctx.fillRect(0, 0, cw, ch);
 
   // filled area
@@ -244,7 +220,7 @@ function drawPlot(ctx, cw, ch, opts) {
       var ncy = t.toCanvasY(nd.y[ni]);
       ctx.beginPath();
       ctx.arc(ncx, ncy, 5, 0, 2 * Math.PI);
-      ctx.fillStyle = "#084594";
+      ctx.fillStyle = "#0f0";
       ctx.fill();
     }
   }
@@ -492,12 +468,12 @@ function renderFault() {
   faultTr = makePlotTransform(cw, ch, 0, X_END, -50, 10);
   drawPlot(ctxFault, cw, ch, {
     transform: faultTr,
-    fill: { x: xGrid, y: faultZ, color: "rgba(8,69,148,0.08)", base: "bottom" },
-    lines: [{ x: xGrid, y: faultZ, color: "#084594", width: 2 }]
+    fill: { x: xGrid, y: faultZ, color: "rgba(0,255,0,0.08)", base: "bottom" },
+    lines: [{ x: xGrid, y: faultZ, color: "#0f0", width: 2 }]
   });
 
   // Surface reference line at z=0
-  ctxFault.strokeStyle = "rgba(0,0,0,0.12)";
+  ctxFault.strokeStyle = "rgba(0,255,0,0.12)";
   ctxFault.lineWidth = 1;
   ctxFault.beginPath();
   ctxFault.moveTo(faultTr.toCanvasX(0), faultTr.toCanvasY(0));
@@ -506,7 +482,7 @@ function renderFault() {
 
   // Axial planes: dashed lines from kink to surface intersection (drawn before dots)
   ctxFault.setLineDash([4, 3]);
-  ctxFault.strokeStyle = "#6baed6";
+  ctxFault.strokeStyle = "#0a0";
   ctxFault.lineWidth = 1;
   for (var ai = 0; ai < axialData.length; ai++) {
     var ax = axialData[ai];
@@ -521,7 +497,7 @@ function renderFault() {
   for (var ai = 0; ai < axialData.length; ai++) {
     ctxFault.beginPath();
     ctxFault.arc(faultTr.toCanvasX(axialData[ai].xSurf), faultTr.toCanvasY(0), 3, 0, 2 * Math.PI);
-    ctxFault.fillStyle = "#6baed6";
+    ctxFault.fillStyle = "#0a0";
     ctxFault.fill();
   }
 
@@ -529,7 +505,7 @@ function renderFault() {
   for (var ni = 0; ni < xctrl.length; ni++) {
     ctxFault.beginPath();
     ctxFault.arc(faultTr.toCanvasX(xctrl[ni]), faultTr.toCanvasY(zctrl[ni]), 5, 0, 2 * Math.PI);
-    ctxFault.fillStyle = "#084594";
+    ctxFault.fillStyle = "#0f0";
     ctxFault.fill();
   }
 }
@@ -549,13 +525,13 @@ function renderUplift() {
   var t = makePlotTransform(cw, ch, 0, X_END, uMin, uMax);
   drawPlot(ctxUplift, cw, ch, {
     transform: t,
-    fill: { x: xGrid, y: upliftRate, color: "rgba(33,113,181,0.10)" },
-    lines: [{ x: xGrid, y: upliftRate, color: "#4292c6", width: 2 }]
+    fill: { x: xGrid, y: upliftRate, color: "rgba(0,255,0,0.10)" },
+    lines: [{ x: xGrid, y: upliftRate, color: "#0f0", width: 2 }]
   });
 
   // Axial surface intersection markers
   ctxUplift.setLineDash([3, 3]);
-  ctxUplift.strokeStyle = "rgba(8,69,148,0.2)";
+  ctxUplift.strokeStyle = "rgba(0,255,0,0.2)";
   ctxUplift.lineWidth = 1;
   for (var ai = 0; ai < axialData.length; ai++) {
     var axX = axialData[ai].xSurf;
@@ -582,8 +558,8 @@ function renderTopo() {
   var t = makePlotTransform(cw, ch, 0, X_END, zMin2, zMax2);
   drawPlot(ctxTopo, cw, ch, {
     transform: t,
-    fill: { x: xGrid, y: topoZ, color: "rgba(33,113,181,0.15)", base: "bottom" },
-    lines: [{ x: xGrid, y: topoZ, color: "#2171b5", width: 2 }]
+    fill: { x: xGrid, y: topoZ, color: "rgba(0,255,0,0.15)", base: "bottom" },
+    lines: [{ x: xGrid, y: topoZ, color: "#0f0", width: 2 }]
   });
 }
 
@@ -701,5 +677,5 @@ rebuildFromFault();
 
 })();
 </script>
-
-
+</body>
+</html>

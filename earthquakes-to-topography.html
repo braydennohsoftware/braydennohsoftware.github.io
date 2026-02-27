@@ -1,11 +1,11 @@
----
-layout: default
-title:  Earthquakes to Topography
----
-
-<p>
-<a href="index.html">Brayden Noh</a>
-</p>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Earthquakes to Topography - Brayden Noh</title>
+</head>
+<body>
+<p><a href="index.html">&lt; back</a></p>
 
 <h1>Earthquake Cycles to Topography</h1>
 
@@ -14,35 +14,23 @@ This simulator models topographic evolution over a planar reverse fault using th
 </p>
 
 <style>
-  .controls {
-    display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px;
-    padding: 15px 20px; background: #f1f3f5; border-radius: 6px;
-  }
-  .button-group {
-    display: flex; gap: 8px; margin-top: 5px;
-  }
-  .controls button {
-    padding: 8px 16px; border: none; border-radius: 4px;
-    background: #3498db; color: #fff; font-weight: bold; cursor: pointer; transition: 0.2s;
-  }
-  .controls button:hover:not(:disabled) { background: #2980b9; }
-  .controls button:disabled { background: #bdc3c7; cursor: not-allowed; }
-
-  .sliders-container {
-    display: flex; flex-direction: column; gap: 12px; flex: 1;
-  }
-  .slider-group { display: flex; align-items: center; gap: 12px; }
-  .slider-group label { font-weight: 600; font-size: 14px; color: #2c3e50; min-width: 220px; }
-  .slider-group input { flex: 1; cursor: pointer; }
-  .slider-val { font-family: monospace; font-size: 14px; font-weight: bold; color: #e74c3c; width: 80px; text-align: right; }
-
-  .info-bar {
-    display: flex; gap: 25px; font-size: 14px; color: #555;
-    margin-bottom: 15px; font-weight: 500; border-bottom: 1px solid #eee; padding-bottom: 10px;
-  }
-  .info-bar span strong { color: #2980b9; font-family: monospace; font-size: 15px; }
-  .plot-title { font-size: 14px; font-weight: 600; color: #34495e; margin: 15px 0 5px 0; }
-  #sim-container canvas { width: 100%; height: auto; display: block; }
+body { background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 14px; margin: 20px; line-height: 1.6; }
+a { color: #0ff; } a:visited { color: #fff; } a:hover { color: #ff0; }
+h1 { color: #0f0; }
+.controls { display: flex; align-items: flex-start; gap: 20px; margin-bottom: 20px; padding: 15px 20px; background: #111; border: 1px solid #0f0; }
+.button-group { display: flex; gap: 8px; margin-top: 5px; }
+.controls button { padding: 8px 16px; border: 1px solid #0f0; background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-weight: bold; cursor: pointer; }
+.controls button:hover:not(:disabled) { background: #0f0; color: #000; }
+.controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+.sliders-container { display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.slider-group { display: flex; align-items: center; gap: 12px; }
+.slider-group label { font-weight: 600; font-size: 14px; color: #0f0; min-width: 220px; font-family: "Courier New", Courier, monospace; }
+.slider-group input { flex: 1; cursor: pointer; accent-color: #0f0; }
+.slider-val { font-family: "Courier New", Courier, monospace; font-size: 14px; font-weight: bold; color: #0ff; width: 80px; text-align: right; }
+.info-bar { display: flex; gap: 25px; font-size: 14px; color: #0f0; margin-bottom: 15px; font-weight: 500; border-bottom: 1px solid #0f0; padding-bottom: 10px; }
+.info-bar span strong { color: #0ff; font-family: "Courier New", Courier, monospace; font-size: 15px; }
+.plot-title { font-size: 14px; font-weight: 600; color: #0f0; margin: 15px 0 5px 0; }
+#sim-container canvas { width: 100%; height: auto; display: block; }
 </style>
 
 <div class="controls">
@@ -301,7 +289,7 @@ function makePlotTransform(cw, ch, xMin, xMax, yMin, yMax) {
 function drawAxes(ctx, t, xLabel, yLabel, xTicks, yTicks, yTickLabels) {
     if (!yTickLabels) yTickLabels = yTicks;
 
-    ctx.strokeStyle = "#333";
+    ctx.strokeStyle = "#0f0";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
 
@@ -314,8 +302,8 @@ function drawAxes(ctx, t, xLabel, yLabel, xTicks, yTicks, yTickLabels) {
     ctx.moveTo(x0, y0); ctx.lineTo(x0, y1);
     ctx.stroke();
 
-    ctx.fillStyle = "#333";
-    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#0f0";
+    ctx.font = "12px 'Courier New', Courier, monospace";
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
@@ -361,8 +349,8 @@ function renderTopo(topoZ, rawZ) {
 
   drawAxes(ctxTopo, t, "Distance from MFT (km)", "Elevation (m)", [0, 20, 40, 60, 80, 100], yTicksKm, yTicksM);
 
-  // Terrain Fill (Gray)
-  ctxTopo.fillStyle = "rgba(180, 180, 180, 0.5)";
+  // Terrain Fill (Green tint)
+  ctxTopo.fillStyle = "rgba(0, 255, 0, 0.15)";
   ctxTopo.beginPath();
   ctxTopo.moveTo(t.toCanvasX(xGrid[0]), t.toCanvasY(0));
   for (var i = 0; i < NX; i++) {
@@ -374,7 +362,7 @@ function renderTopo(topoZ, rawZ) {
 
   // Lake fill overlay
   if (rawZ) {
-    ctxTopo.fillStyle = "rgba(41, 128, 185, 0.6)";
+    ctxTopo.fillStyle = "rgba(0, 255, 255, 0.3)";
     ctxTopo.beginPath();
     ctxTopo.moveTo(t.toCanvasX(xGrid[0]), t.toCanvasY(topoZ[0]));
     for (var i = 1; i < NX; i++) {
@@ -387,8 +375,8 @@ function renderTopo(topoZ, rawZ) {
     ctxTopo.fill();
   }
 
-  // Topographic Line (Black)
-  ctxTopo.strokeStyle = "#000000";
+  // Topographic Line (Green)
+  ctxTopo.strokeStyle = "#0f0";
   ctxTopo.lineWidth = 2;
   ctxTopo.beginPath();
   for (var i = 0; i < NX; i++) {
@@ -420,7 +408,7 @@ function renderUplift(eqFlash) {
   drawAxes(ctxUplift, t, "Distance from MFT (km)", "Uplift (mm/yr)", [0, 20, 40, 60, 80, 100], yTicks);
 
   // Zero line
-  ctxUplift.strokeStyle = "#ccc";
+  ctxUplift.strokeStyle = "#333";
   ctxUplift.lineWidth = 1;
   ctxUplift.setLineDash([4, 4]);
   ctxUplift.beginPath();
@@ -439,7 +427,7 @@ function renderUplift(eqFlash) {
 
   // Draw inactive curve first (behind), then active on top
   // Interseismic (red/diff_v)
-  ctxUplift.strokeStyle = redActive ? "#e74c3c" : "rgba(150,150,150,0.4)";
+  ctxUplift.strokeStyle = redActive ? "#0ff" : "rgba(0,255,0,0.3)";
   ctxUplift.lineWidth = redActive ? 2.5 : 1;
   ctxUplift.beginPath();
   for (var i = 0; i < NX; i++) {
@@ -450,7 +438,7 @@ function renderUplift(eqFlash) {
   ctxUplift.stroke();
 
   // Coseismic (blue/U2_total)
-  ctxUplift.strokeStyle = blueActive ? "#2980b9" : "rgba(150,150,150,0.4)";
+  ctxUplift.strokeStyle = blueActive ? "#0f0" : "rgba(0,255,0,0.3)";
   ctxUplift.lineWidth = blueActive ? 2.5 : 1;
   ctxUplift.beginPath();
   for (var i = 0; i < NX; i++) {
@@ -462,17 +450,17 @@ function renderUplift(eqFlash) {
 
   // Legend (bottom-right, outside data region)
   var lx = cw - PAD.right - 190, ly = ch - PAD.bottom + 28;
-  ctxUplift.font = "11px sans-serif";
+  ctxUplift.font = "11px 'Courier New', Courier, monospace";
   ctxUplift.textAlign = "left";
   ctxUplift.textBaseline = "middle";
 
-  ctxUplift.strokeStyle = "#e74c3c"; ctxUplift.lineWidth = 2.5;
+  ctxUplift.strokeStyle = "#0ff"; ctxUplift.lineWidth = 2.5;
   ctxUplift.beginPath(); ctxUplift.moveTo(lx, ly); ctxUplift.lineTo(lx+20, ly); ctxUplift.stroke();
-  ctxUplift.fillStyle = "#333"; ctxUplift.fillText("Interseismic", lx+25, ly);
+  ctxUplift.fillStyle = "#0f0"; ctxUplift.fillText("Interseismic", lx+25, ly);
 
-  ctxUplift.strokeStyle = "#2980b9"; ctxUplift.lineWidth = 2.5;
+  ctxUplift.strokeStyle = "#0f0"; ctxUplift.lineWidth = 2.5;
   ctxUplift.beginPath(); ctxUplift.moveTo(lx+110, ly); ctxUplift.lineTo(lx+130, ly); ctxUplift.stroke();
-  ctxUplift.fillStyle = "#333"; ctxUplift.fillText("Coseismic", lx+135, ly);
+  ctxUplift.fillStyle = "#0f0"; ctxUplift.fillText("Coseismic", lx+135, ly);
 }
 
 function renderFault(eqFlash) {
@@ -485,7 +473,7 @@ function renderFault(eqFlash) {
   drawAxes(ctxFault, t, "Distance from MFT (km)", "Depth (km)", [0, 20, 40, 60, 80, 100], yTicks);
 
   // z=0 dashed line
-  ctxFault.strokeStyle = "#ccc";
+  ctxFault.strokeStyle = "#333";
   ctxFault.lineWidth = 1;
   ctxFault.setLineDash([4, 4]);
   ctxFault.beginPath();
@@ -494,7 +482,7 @@ function renderFault(eqFlash) {
   ctxFault.stroke();
   ctxFault.setLineDash([]);
 
-  var colorActive = "#e74c3c", colorInactive = "#95a5a6";
+  var colorActive = "#0ff", colorInactive = "#555";
   var widthActive = 3.5, widthInactive = 1.5;
 
   var eqInterval = getInterval();
@@ -681,3 +669,5 @@ updateInfo();
 
 })();
 </script>
+</body>
+</html>

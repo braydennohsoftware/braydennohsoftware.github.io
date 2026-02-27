@@ -1,11 +1,26 @@
----
-layout: default
-title:  Meander Cutoffs Induce Chaos
----
-
-<p>
-<a href="index.html">Brayden Noh</a>
-</p>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Meander Cutoffs Induce Chaos - Brayden Noh</title>
+<style>
+body { background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 14px; margin: 20px; line-height: 1.6; }
+a { color: #0ff; }
+a:visited { color: #fff; }
+a:hover { color: #ff0; }
+h1, h3 { color: #0f0; }
+button { background: #000; color: #0f0; border: 1px solid #0f0; font-family: "Courier New", Courier, monospace; cursor: pointer; }
+button:hover { background: #0f0; color: #000; }
+input[type="range"] { accent-color: #0f0; }
+label { color: #0f0; }
+</style>
+<script>
+MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+<p><a href="index.html">&lt; back</a></p>
 
 <h1>Meander Cutoffs Induce Chaos</h1>
 <h3>by Brayden Noh and Omar Wani</h3>
@@ -36,15 +51,15 @@ The challenge is that the river geometry changes length over time, so we can't d
     <div id="chaos-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:white;font-size:90%;">Loading data&hellip;</div>
   </div>
   <div style="display:flex; align-items:center; gap:0.4em; margin-top:0.3em;">
-    <span style="font-size:75%; color:#767676;">0</span>
+    <span style="font-size:75%; color:#0f0;">0</span>
     <canvas id="chaos-colorbar" width="200" height="12" style="max-width:200px;"></canvas>
-    <span style="font-size:75%; color:#767676;">100</span>
-    <span style="font-size:75%; color:#767676; margin-left:0.3em;">ensemble occupancy</span>
+    <span style="font-size:75%; color:#0f0;">100</span>
+    <span style="font-size:75%; color:#0f0; margin-left:0.3em;">ensemble occupancy</span>
   </div>
-  <div id="chaos-info" style="font-size:75%; color:#767676; margin-top:0.2em;">Loading&hellip;</div>
+  <div id="chaos-info" style="font-size:75%; color:#0f0; margin-top:0.2em;">Loading&hellip;</div>
 </div>
 
-<p style="font-size: 85%; color: #767676;">
+<p style="font-size: 85%; color: #0a0;">
 <b>Figure 1.</b> Interactive Eulerian occupancy heatmap of 100 ensemble simulations with cutoffs enabled. Drag the grid slider to change resolution continuously (10&ndash;100 m); scrub through time to see trajectories diverge.
 </p>
 
@@ -325,3 +340,5 @@ The Lyapunov exponent converges with grid refinement, is insensitive to perturba
 <p>
 By Brayden Noh (Harvard, Dept. of Earth and Planetary Sciences) and Omar Wani (NYU Tandon School of Engineering).
 </p>
+</body>
+</html>

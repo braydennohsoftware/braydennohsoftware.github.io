@@ -6,22 +6,22 @@
     <title>Coastal Terrace Subduction Simulator</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #121212; color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden;
+            font-family: "Courier New", Courier, monospace;
+            background: #000; color: #eee; margin: 0; display: flex; height: 100vh; overflow: hidden;
         }
         #sidebar {
-            width: 340px; background: #1e1e1e; padding: 25px 20px; display: flex; flex-direction: column; gap: 15px;
-            border-right: 1px solid #333; z-index: 10; box-shadow: 2px 0 10px rgba(0,0,0,0.5); overflow-y: auto;
+            width: 340px; background: #000; padding: 25px 20px; display: flex; flex-direction: column; gap: 15px;
+            border-right: 1px solid #0f0; z-index: 10; box-shadow: 2px 0 10px rgba(0,0,0,0.5); overflow-y: auto;
         }
         #main { flex-grow: 1; position: relative; cursor: ns-resize; }
         canvas { display: block; width: 100%; height: 100%; }
 
-        h2 { margin: 0 0 5px 0; font-size: 1.1rem; color: #4da6ff; text-transform: uppercase; letter-spacing: 1px; }
-        .control { background: #2a2a2a; padding: 12px; border-radius: 6px; border: 1px solid #333; }
+        h2 { margin: 0 0 5px 0; font-size: 1.1rem; color: #0f0; text-transform: uppercase; letter-spacing: 1px; }
+        .control { background: #111; padding: 12px; border-radius: 6px; border: 1px solid #0f0; }
         .control label { display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 8px; font-weight: 500; }
-        .val { color: #ffcc00; font-weight: bold; }
-        input[type=range] { width: 100%; margin: 0; cursor: pointer; accent-color: #4da6ff; }
-        .hint { font-size: 0.75rem; color: #888; margin-top: 5px; line-height: 1.3; }
+        .val { color: #0ff; font-weight: bold; }
+        input[type=range] { width: 100%; margin: 0; cursor: pointer; accent-color: #0f0; }
+        .hint { font-size: 0.75rem; color: #0a0; margin-top: 5px; line-height: 1.3; }
 
         #hud {
             position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.75); padding: 15px 20px;
@@ -30,19 +30,20 @@
         #hud p { margin: 8px 0; }
 
         .btn {
-            background: #4da6ff; color: #000; border: none; padding: 12px; border-radius: 6px;
+            background: #0f0; color: #000; border: none; padding: 12px; border-radius: 6px;
             cursor: pointer; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: background 0.2s;
         }
-        .btn:hover { background: #3388dd; }
-        .instructions { font-size: 0.85rem; color: #bbb; margin-top: auto; line-height: 1.5; padding-top: 20px; text-align: center; }
+        .btn:hover { background: #0a0; }
+        .instructions { font-size: 0.85rem; color: #0a0; margin-top: auto; line-height: 1.5; padding-top: 20px; text-align: center; }
 
         .checkbox-container { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem; padding: 5px 0; }
-        .checkbox-container input { cursor: pointer; width: 18px; height: 18px; accent-color: #4da6ff; }
+        .checkbox-container input { cursor: pointer; width: 18px; height: 18px; accent-color: #0f0; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
+        <p style="margin:0 0 10px 0;"><a href="index.html" style="color:#0ff;">&lt; back</a></p>
         <h2>Subduction Zone</h2>
         <div class="control">
             <label>Locking Depth <span class="val" id="val_locked">5 km</span></label>
@@ -89,10 +90,10 @@
     <div id="main">
         <canvas id="simCanvas"></canvas>
         <div id="hud">
-            <p style="color: #4da6ff">Time: <span id="hud_time" style="font-weight: bold;">0.0 ka</span></p>
-            <p style="color: #74ebd5">Sea Level: <span id="hud_sl" style="font-weight: bold;">0.0 m</span></p>
+            <p style="color: #0f0">Time: <span id="hud_time" style="font-weight: bold;">0.0 ka</span></p>
+            <p style="color: #0ff">Sea Level: <span id="hud_sl" style="font-weight: bold;">0.0 m</span></p>
             <p style="color: #ff9999">Next EQ: <span id="hud_eq" style="font-weight: bold;">200 yr</span></p>
-            <p style="color: #ffcc00">Earthquakes: <span id="hud_eqcount" style="font-weight: bold;">0</span></p>
+            <p style="color: #0ff">Earthquakes: <span id="hud_eqcount" style="font-weight: bold;">0</span></p>
         </div>
     </div>
 

@@ -1,11 +1,26 @@
----
-layout: default
-title:  Human-River Geomorphic Coupling
----
-
-<p>
-<a href="index.html">Brayden Noh</a>
-</p>
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Human-River Geomorphic Coupling - Brayden Noh</title>
+<style>
+body { background: #000; color: #0f0; font-family: "Courier New", Courier, monospace; font-size: 14px; margin: 20px; line-height: 1.6; }
+a { color: #0ff; }
+a:visited { color: #fff; }
+a:hover { color: #ff0; }
+h1 { color: #0f0; }
+button { background: #000; color: #0f0; border: 1px solid #0f0; font-family: "Courier New", Courier, monospace; cursor: pointer; padding: 4px 12px; }
+button:hover:not(:disabled) { background: #0f0; color: #000; }
+button:disabled { opacity: 0.35; cursor: default; }
+input[type="range"] { accent-color: #0f0; }
+</style>
+<script>
+MathJax = { tex: { inlineMath: [['\\(','\\)']], displayMath: [['\\[','\\]']] } };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+<p><a href="index.html">&lt; back</a></p>
 
 <h1>Human-River Geomorphic Coupling</h1>
 
@@ -32,15 +47,15 @@ where \(\mathcal{D}(\mathbf{x},t) = \min_{\mathbf{y}:\,R(\mathbf{y},t)=1} \|\mat
 <!-- ═══ Simulator ═══ -->
 
 <div id="sim-container" style="margin: 1.5rem 0;">
-  <canvas id="sim-canvas" style="width: 100%; image-rendering: pixelated; background: #000; border: 1px solid #ccc;"></canvas>
+  <canvas id="sim-canvas" style="width: 100%; image-rendering: pixelated; background: #000; border: 1px solid #0f0;"></canvas>
 </div>
 
-<div id="sim-info" style="font-family: monospace; font-size: 14px; margin-bottom: 0.5rem;">
+<div id="sim-info" style="font-family: monospace; font-size: 14px; margin-bottom: 0.5rem; color: #0f0;">
   Timestep: <span id="info-timestep">0</span> / <span id="info-total">1001</span> &nbsp;&bull;&nbsp;
   Population: <span id="info-pop">0</span> &nbsp;&bull;&nbsp;
   Clusters: <span id="info-clusters">0</span>
 </div>
-<div id="sim-legend" style="font-family: monospace; font-size: 13px; margin-bottom: 1rem; display: flex; flex-wrap: wrap; gap: 8px 16px;">
+<div id="sim-legend" style="font-family: monospace; font-size: 13px; margin-bottom: 1rem; color: #0f0; display: flex; flex-wrap: wrap; gap: 8px 16px;">
   <span><span style="display:inline-block;width:12px;height:12px;background:#00f;vertical-align:middle;margin-right:3px;"></span>River</span>
   <span><span style="display:inline-block;width:12px;height:12px;background:#ff8000;vertical-align:middle;margin-right:3px;"></span>Stable <span id="info-stable">0</span></span>
   <span><span style="display:inline-block;width:12px;height:12px;background:#1aff1a;vertical-align:middle;margin-right:3px;"></span>New <span id="info-new">0</span></span>
@@ -468,3 +483,5 @@ sliders.pop.el.addEventListener("change", () => {
 loadRiverData().then(() => { initVillage(); });
 })();
 </script>
+</body>
+</html>
